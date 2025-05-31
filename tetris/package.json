@@ -1,0 +1,32 @@
+{
+  "name": "z-spin",
+  "version": "1.0.0",
+  "description": "A Tetris game built with Phaser 3, TypeScript, and Rollup",
+  "main": "dist/bundle.js",
+  "scripts": {
+    "dev": "rollup -c -w",
+    "build": "rollup -c",
+    "start": "node server.js"
+  },
+  "keywords": [
+    "phaser",
+    "tetris",
+    "typescript",
+    "rollup"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-typescript": "^11.1.6",
+    "phaser": "^3.80.1",
+    "rollup": "^4.9.6",
+    "tslib": "^2.6.2",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.16.0"
+  }
+} 

@@ -1,1 +1,3 @@
-# z-spin\n\nAI for Tetris.
+# z-spin
+
+Tetris AI
