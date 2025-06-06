@@ -1,0 +1,21 @@
+{
+  "name": "z-spin-engine",
+  "type": "module",
+  "description": "WebAssembly Tetris engine",
+  "version": "0.1.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/example/z-spin"
+  },
+  "files": [
+    "z_spin_engine_bg.wasm",
+    "z_spin_engine.js",
+    "z_spin_engine.d.ts"
+  ],
+  "main": "z_spin_engine.js",
+  "types": "z_spin_engine.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

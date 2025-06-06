@@ -2,5 +2,17 @@
 name = "z-spin-engine"
 version = "0.1.0"
 edition = "2021"
+description = "WebAssembly Tetris engine"
+license = "MIT"
+repository = "https://github.com/example/z-spin"
 
-[dependencies] 
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+
+[profile.release]
+opt-level = 3
+lto = true 

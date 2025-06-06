@@ -1,18 +1,22 @@
 {
   "name": "z-spin",
   "version": "1.0.0",
-  "description": "A Tetris game built with Phaser 3, TypeScript, and Rollup",
+  "description": "A Tetris game built with Phaser 3, TypeScript, Rollup, and WebAssembly",
   "main": "dist/bundle.js",
   "scripts": {
     "dev": "rollup -c -w",
-    "build": "rollup -c",
-    "start": "node server.js"
+    "build": "cd ../engine && ./build.sh && cd ../tetris && rollup -c",
+    "start": "node server.js",
+    "build:wasm": "cd ../engine && ./build.sh"
   },
   "keywords": [
     "phaser",
     "tetris",
     "typescript",
-    "rollup"
+    "rollup",
+    "wasm",
+    "webassembly",
+    "rust"
   ],
   "author": "",
   "license": "MIT",

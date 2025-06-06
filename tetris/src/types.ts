@@ -23,11 +23,24 @@ export interface GameSettings {
     };
 }
 
+export interface TetrominoState {
+    shape: number[][];
+    x: number;
+    y: number;
+    color: number;
+    rotation: number;
+    typeKey: keyof typeof import('../src/constants').TETROMINOES;
+}
+
+export interface HeldTetrominoState {
+    typeKey: keyof typeof import('../src/constants').TETROMINOES;
+}
+
 export const DEFAULT_SETTINGS: GameSettings = {
     ghostPieceEnabled: true,
     gravityValue: 500,
-    arr: 0,
-    das: 90,
+    arr: 16,
+    das: 133,
     dcd: 0,
     sdf: Infinity,
     nextQueueSize: 5,
