@@ -120,14 +120,6 @@ impl Board {
         ClearInfo {}
     }
 
-    pub fn hash(&self) -> u64 {
-        let mut hash = 0u64;
-        for (i, &row) in self.rows.iter().enumerate() {
-            hash = hash.wrapping_mul(31).wrapping_add(row as u64).wrapping_add(i as u64);
-        }
-        hash
-    }
-
     // Get column heights for evaluation
     pub fn get_heights(&self) -> [usize; BOARD_WIDTH] {
         let mut heights = [0; BOARD_WIDTH];

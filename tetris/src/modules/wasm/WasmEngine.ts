@@ -184,10 +184,10 @@ export class WasmEngine {
       case 'move_right':
         this.gameScene.gameLogic.moveBlockRight();
         break;
-      case 'move_all_the_way_left':
+      case 'move_to_left':
         this.gameScene.gameLogic.moveAllTheWayLeft();
         break;
-      case 'move_all_the_way_right':
+      case 'move_to_right':
         this.gameScene.gameLogic.moveAllTheWayRight();
         break;
       case 'rotate':
@@ -198,6 +198,9 @@ export class WasmEngine {
         break;
       case 'rotate_180':
         this.gameScene.gameLogic.rotate('180');
+        break;
+      case 'soft_drop':
+        this.gameScene.gameLogic.moveToBottom();
         break;
       case 'move_down':
         this.gameScene.gameLogic.moveBlockDown(true);

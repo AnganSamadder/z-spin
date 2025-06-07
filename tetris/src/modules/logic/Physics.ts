@@ -166,10 +166,13 @@ export class Physics {
     public moveToBottom(): { landed: boolean } {
         if (!this.gameState.currentTetromino) return { landed: false };
         let moved = false;
+        let distance = 0;
         while (!this.checkCollision(this.gameState.currentTetromino.x, this.gameState.currentTetromino.y + 1, this.gameState.currentTetromino.shape)) {
             this.gameState.currentTetromino.y++;
+            distance++;
             moved = true;
         }
+        this.gameState.score += distance; // Award 1 point per cell dropped
         if (moved) {
             this.gameState.isPieceLanded = true;
             return { landed: true };
@@ -268,8 +271,6 @@ export class Physics {
             // In a full Tetris implementation, you might multiply by level
             // For now, we'll use the base score
             this.gameState.score += baseScore;
-            
-            console.log(`Lines cleared: ${linesCleared}, Score awarded: ${baseScore}, Total score: ${this.gameState.score}`);
         }
         return linesCleared;
     }

@@ -23,7 +23,7 @@ export class InputHandler {
     private phaserKeys: { [keyCode: string]: Phaser.Input.Keyboard.Key } = {};
     private actionKeyObjects: { [action: string]: Phaser.Input.Keyboard.Key[] } = {};
     private singlePressActions: Set<string> = new Set([
-        'rotateCW', 'rotateCCW', 'rotate180', 'hardDrop', 'holdPiece', 'resetGame'
+        'rotateCW', 'rotateCCW', 'rotate180', 'hardDrop', 'holdPiece', 'resetGame', 'softDrop'
     ]);
 
     private moveDelay: number = 70;
@@ -118,13 +118,6 @@ export class InputHandler {
 
         if (this.scene.gameState.gameOver || !this.scene.gameState.canManipulatePiece || !this.scene.gameState.currentTetromino || !this.input?.keyboard) return;
 
-        // Handle single-press actions, including SDF=Infinity
-        if (this.actionKeyObjects.softDrop?.some(k => Phaser.Input.Keyboard.JustDown(k))) {
-            if (this.sdf === Infinity) {
-                this.scene.gameLogic.moveToBottom();
-            }
-        }
-
         for (const action of this.singlePressActions) {
             let actionTriggered = false;
             if (this.actionKeyObjects[action]) {
@@ -142,6 +135,11 @@ export class InputHandler {
                     case 'rotate180': this.scene.gameLogic.rotate('180'); break;
                     case 'hardDrop': this.scene.gameLogic.performHardDrop(); break;
                     case 'holdPiece': this.scene.gameLogic.performHold(); break;
+                    case 'softDrop':
+                        if (this.sdf === Infinity) {
+                            this.scene.gameLogic.moveToBottom();
+                        }
+                        break;
                 }
             }
         }

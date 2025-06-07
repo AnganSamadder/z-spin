@@ -8,7 +8,6 @@ pub struct TetrisEngine {
     search_engine: SearchEngine,
     current_move_sequence: Vec<String>,
     sequence_index: usize,
-    expected_board: Option<Board>,
     arr: u32,
     das: u32,
     sdf: u32,
@@ -22,7 +21,6 @@ impl TetrisEngine {
             search_engine: SearchEngine::new(),
             current_move_sequence: Vec::new(),
             sequence_index: 0,
-            expected_board: None,
             arr: 16,
             das: 133,
             sdf: u32::MAX,
@@ -44,26 +42,15 @@ impl TetrisEngine {
     }
 
     pub fn get_best_move(&mut self, board: &[i32], current_piece: i32, next_piece: i32, strategy: Strategy) -> String {
-        let board_obj = Board::from_flat_array(board);
-
-        // Continue existing sequence if we have one and the board hasn't changed unexpectedly
-        if !self.current_move_sequence.is_empty() && self.sequence_index < self.current_move_sequence.len() {
-             if let Some(expected_board) = &self.expected_board {
-                if expected_board.hash() == board_obj.hash() {
-                    let next_move = self.current_move_sequence[self.sequence_index].clone();
-                    self.sequence_index += 1;
-                    return next_move;
-                } else {
-                    if self.debug {
-                        console_log!("Board state changed unexpectedly. Was:");
-                        expected_board.display_board("Expected", None);
-                        console_log!("Is now:");
-                        board_obj.display_board("Actual", None);
-                    }
-                }
-            }
+        // If a sequence is in progress, continue it.
+        if self.sequence_index < self.current_move_sequence.len() {
+            let next_move = self.current_move_sequence[self.sequence_index].clone();
+            self.sequence_index += 1;
+            return next_move;
         }
-        
+
+        // Sequence is finished or not present. Generate a new one.
+        let board_obj = Board::from_flat_array(board);
         let piece_type = PieceType::from_i32(current_piece).unwrap_or(PieceType::I);
         let next_piece_type = PieceType::from_i32(next_piece);
 
@@ -71,15 +58,15 @@ impl TetrisEngine {
         let search_result = self.search_engine.search(&board_obj, piece_type, next_piece_type, strategy, self.arr, self.das, self.debug);
         self.current_move_sequence = search_result.best_move.split(',').map(String::from).collect();
         self.sequence_index = 0;
-
-        let final_board = self.calculate_final_board(&board_obj, piece_type, &self.current_move_sequence);
-        self.expected_board = Some(final_board);
         
-        if !self.current_move_sequence.is_empty() {
+        if !self.current_move_sequence.is_empty() && self.current_move_sequence[0] != "" {
             let next_move = self.current_move_sequence[self.sequence_index].clone();
             self.sequence_index += 1;
             next_move
         } else {
+            // Fallback to hard_drop if the sequence is empty for some reason
+            self.current_move_sequence = vec!["hard_drop".to_string()];
+            self.sequence_index = 1;
             "hard_drop".to_string()
         }
     }
@@ -91,9 +78,5 @@ impl TetrisEngine {
 
         let search_result = self.search_engine.search(&board_obj, piece_type, next_piece_type, strategy, self.arr, self.das, true); // Debug is true for this function
         search_result.best_move
-    }
-
-    fn calculate_final_board(&self, board: &Board, _piece_type: PieceType, _sequence: &Vec<String>) -> Board {
-        board.clone()
     }
 } 

@@ -133,7 +133,6 @@ export class GameLogic {
             // Update score display if lines were cleared
             if (result.clearedLines > 0) {
                 this.renderer.updateScore(this.gameState.score);
-                console.log(`GameLogic: ${result.clearedLines} lines cleared, score updated to ${this.gameState.score}`);
             }
             this.spawnNewTetromino();
         }
@@ -185,7 +184,6 @@ export class GameLogic {
         // Update score display again if lines were cleared
         if (result.clearedLines > 0) {
             this.renderer.updateScore(this.gameState.score);
-            console.log(`GameLogic: Hard drop + ${result.clearedLines} lines cleared, score updated to ${this.gameState.score}`);
         }
 
         // After a hard drop, a new piece is spawned immediately.
