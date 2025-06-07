@@ -137,9 +137,9 @@ export class InputHandler {
             }
             if (actionTriggered) {
                 switch (action) {
-                    case 'rotateCW': this.scene.gameLogic.rotate(true); break;
-                    case 'rotateCCW': this.scene.gameLogic.rotate(false); break;
-                    case 'rotate180': this.scene.gameLogic.rotate180(); break;
+                    case 'rotateCW': this.scene.gameLogic.rotate('clockwise'); break;
+                    case 'rotateCCW': this.scene.gameLogic.rotate('counter-clockwise'); break;
+                    case 'rotate180': this.scene.gameLogic.rotate('180'); break;
                     case 'hardDrop': this.scene.gameLogic.performHardDrop(); break;
                     case 'holdPiece': this.scene.gameLogic.performHold(); break;
                 }

@@ -37,14 +37,28 @@ export class Physics {
         return false;
     }
 
-    public rotate(isClockwise: boolean): { success: boolean; landed: boolean } {
+    public rotate(direction: 'clockwise' | 'counter-clockwise' | '180'): { success: boolean; landed: boolean } {
         if (!this.gameState.currentTetromino) return { success: false, landed: false };
         const typeKey = this.gameState.currentTetromino.typeKey as keyof typeof TETROMINOES;
         if (typeKey === 'O') return { success: false, landed: this.gameState.isPieceLanded };
 
         const tetrominoData = TETROMINOES[typeKey];
         const currentRotationState = this.gameState.currentTetromino.rotation;
-        const nextRotationState = (isClockwise ? (currentRotationState + 1) : (currentRotationState + 3)) % 4;
+        
+        let rotationAmount: number;
+        switch (direction) {
+            case 'clockwise':
+                rotationAmount = 1;
+                break;
+            case 'counter-clockwise':
+                rotationAmount = 3;
+                break;
+            case '180':
+                rotationAmount = 2;
+                break;
+        }
+
+        const nextRotationState = (currentRotationState + rotationAmount) % 4;
         const nextShape = tetrominoData.shapes[nextRotationState];
 
         const kickTableKey = `${currentRotationState}->${nextRotationState}`;

@@ -82,6 +82,13 @@ impl Piece {
             ..*self
         }
     }
+
+    pub fn rotated_180(&self) -> Self {
+        Self {
+            rotation: (self.rotation + 2) % 4,
+            ..*self
+        }
+    }
 }
 
 // Pre-baked tetromino masks [piece][rotation][x] -> column mask

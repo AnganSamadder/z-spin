@@ -191,10 +191,13 @@ export class WasmEngine {
         this.gameScene.gameLogic.moveAllTheWayRight();
         break;
       case 'rotate':
-        this.gameScene.gameLogic.rotate(true); // Assuming CW rotation
+        this.gameScene.gameLogic.rotate('clockwise');
         break;
       case 'rotate_ccw':
-        this.gameScene.gameLogic.rotate(false);
+        this.gameScene.gameLogic.rotate('counter-clockwise');
+        break;
+      case 'rotate_180':
+        this.gameScene.gameLogic.rotate('180');
         break;
       case 'move_down':
         this.gameScene.gameLogic.moveBlockDown(true);

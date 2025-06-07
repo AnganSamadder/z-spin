@@ -153,6 +153,7 @@ impl SearchEngine {
             let mut moves: Vec<(Piece, &str, usize)> = Vec::new();
             moves.push((piece.rotated(true), "rotate", 1));
             moves.push((piece.rotated(false), "rotate_ccw", 1));
+            moves.push((piece.rotated_180(), "rotate_180", 1));
             moves.push((piece.moved(-1, 0), "move_left", 1));
             moves.push((piece.moved(1, 0), "move_right", 1));
 

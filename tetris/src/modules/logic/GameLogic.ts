@@ -107,9 +107,9 @@ export class GameLogic {
         }
     }
 
-    public rotate(isClockwise: boolean): void {
+    public rotate(direction: 'clockwise' | 'counter-clockwise' | '180'): void {
         if (!this.gameState.canManipulatePiece || !this.gameState.currentTetromino) return;
-        const result = this.physics.rotate(isClockwise);
+        const result = this.physics.rotate(direction);
         if (result.success) {
             if (this.gameState.isPieceLanded) {
                 this.scene.startLockDelayTimer();
@@ -117,20 +117,6 @@ export class GameLogic {
                 this.scene.cancelLockDelayTimer();
             }
             this.renderer.drawGame();
-        }
-    }
-
-    public rotate180(): void {
-        if (!this.gameState.canManipulatePiece || !this.gameState.currentTetromino) return;
-        const result1 = this.physics.rotate(true);
-        if (result1.success) {
-            const result2 = this.physics.rotate(true);
-            if (result2.success) {
-                if (this.gameState.isPieceLanded) {
-                    this.scene.startLockDelayTimer(); // Reset the timer
-                }
-                this.renderer.drawGame();
-            }
         }
     }
 
