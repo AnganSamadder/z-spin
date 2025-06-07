@@ -67,12 +67,11 @@ export class Physics {
     }
 
     private handlePostSuccessfulMoveRotation(): boolean {
-        if (!this.gameState.currentTetromino) return false;
-
-        const landedAfterMove = this.checkCollision(this.gameState.currentTetromino.x, this.gameState.currentTetromino.y + 1, this.gameState.currentTetromino.shape);
-
-        if (this.gameState.isPieceLanded && this.gameState.lockResetsCount < this.gameState.maxLockResets) {
-             this.gameState.lockResetsCount++;
+        const landedAfterMove = this.checkCollision(this.gameState.currentTetromino!.x, this.gameState.currentTetromino!.y + 1, this.gameState.currentTetromino!.shape);
+        
+        // Reset lock resets only if the piece moves away from the ground
+        if (!landedAfterMove && this.gameState.isPieceLanded) {
+            this.gameState.lockResetsCount = 0;
         }
         
         this.gameState.isPieceLanded = landedAfterMove;
@@ -118,6 +117,50 @@ export class Physics {
             return { success: true, landed };
         }
         return { success: false, landed: this.gameState.isPieceLanded };
+    }
+
+    public moveAllTheWayLeft(): { success: boolean, landed: boolean } {
+        if (!this.gameState.currentTetromino) return { success: false, landed: false };
+        let moved = false;
+        while (!this.checkCollision(this.gameState.currentTetromino.x - 1, this.gameState.currentTetromino.y, this.gameState.currentTetromino.shape)) {
+            this.gameState.currentTetromino.x--;
+            moved = true;
+        }
+        if (moved) {
+            this.gameState.lastAction = 'move';
+            const landed = this.handlePostSuccessfulMoveRotation();
+            return { success: true, landed };
+        }
+        return { success: false, landed: this.gameState.isPieceLanded };
+    }
+
+    public moveAllTheWayRight(): { success: boolean, landed: boolean } {
+        if (!this.gameState.currentTetromino) return { success: false, landed: false };
+        let moved = false;
+        while (!this.checkCollision(this.gameState.currentTetromino.x + 1, this.gameState.currentTetromino.y, this.gameState.currentTetromino.shape)) {
+            this.gameState.currentTetromino.x++;
+            moved = true;
+        }
+        if (moved) {
+            this.gameState.lastAction = 'move';
+            const landed = this.handlePostSuccessfulMoveRotation();
+            return { success: true, landed };
+        }
+        return { success: false, landed: this.gameState.isPieceLanded };
+    }
+
+    public moveToBottom(): { landed: boolean } {
+        if (!this.gameState.currentTetromino) return { landed: false };
+        let moved = false;
+        while (!this.checkCollision(this.gameState.currentTetromino.x, this.gameState.currentTetromino.y + 1, this.gameState.currentTetromino.shape)) {
+            this.gameState.currentTetromino.y++;
+            moved = true;
+        }
+        if (moved) {
+            this.gameState.isPieceLanded = true;
+            return { landed: true };
+        }
+        return { landed: this.gameState.isPieceLanded };
     }
 
     public performHardDrop(): { clearedLines: number, gameOver: boolean } {
@@ -188,7 +231,31 @@ export class Physics {
         }
 
         if (linesCleared > 0) {
-            // Scoring logic would go here
+            // Standard Tetris scoring system
+            let baseScore = 0;
+            switch (linesCleared) {
+                case 1:
+                    baseScore = 100; // Single
+                    break;
+                case 2:
+                    baseScore = 300; // Double
+                    break;
+                case 3:
+                    baseScore = 500; // Triple
+                    break;
+                case 4:
+                    baseScore = 800; // Tetris
+                    break;
+                default:
+                    baseScore = linesCleared * 100; // Fallback for unusual cases
+                    break;
+            }
+            
+            // In a full Tetris implementation, you might multiply by level
+            // For now, we'll use the base score
+            this.gameState.score += baseScore;
+            
+            console.log(`Lines cleared: ${linesCleared}, Score awarded: ${baseScore}, Total score: ${this.gameState.score}`);
         }
         return linesCleared;
     }

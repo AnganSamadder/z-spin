@@ -1,16 +1,50 @@
-# General ignores
+# Rust/Cargo
+engine/target/
+engine/pkg/
+
+# Node.js
 node_modules/
+tetris/node_modules/
+
+# Build outputs
 dist/
+tetris/dist/
+
+# WASM generated files
+tetris/wasm/
+tetris/public/static/*.wasm
+tetris/public/static/*.js
+tetris/public/static/*.d.ts
 
 # macOS
 .DS_Store
+.DS_Store?
 
 # IDEs
 .vscode/
 .idea/
+*.swp
+*.swo
 
 # Logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.test
+
+# Package lock files (optional - some teams prefer to track these)
+# package-lock.json
+# yarn.lock
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+
+# Debug files
+debug.log

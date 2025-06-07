@@ -47,6 +47,9 @@ export class GameLogic {
             return;
         }
 
+        // Reset manipulation flag to allow player control of new piece
+        this.gameState.canManipulatePiece = true;
+
         if (result.landed) {
             this.scene.startLockDelayTimer();
         } else {
@@ -58,11 +61,23 @@ export class GameLogic {
 
     public moveBlockDown(isSoftDrop: boolean = false): void {
         if (!this.gameState.canManipulatePiece || !this.gameState.currentTetromino) return;
+        
+        const wasLanded = this.gameState.isPieceLanded;
         const result = this.physics.moveBlockDown(isSoftDrop);
-        if (result.landed && !this.gameState.isPieceLanded) {
-            this.gameState.isPieceLanded = true; // State is updated by physics, but we check to avoid redundant timer starts
-            this.scene.startLockDelayTimer();
+        
+        // Update score display if soft drop awarded points
+        if (isSoftDrop) {
+            this.renderer.updateScore(this.gameState.score);
         }
+        
+        // Only start lock delay timer if piece just landed (transition from falling to landed)
+        if (result.landed && !wasLanded) {
+            this.scene.startLockDelayTimer();
+        } else if (!result.landed && wasLanded) {
+            // Piece was landed but moved down, cancel lock delay
+            this.scene.cancelLockDelayTimer();
+        }
+        
         this.renderer.drawGame();
     }
 
@@ -129,7 +144,11 @@ export class GameLogic {
         if (result.gameOver) {
             this.handleGeneralGameOver();
         } else {
-            // Line clear logic and scoring can be handled here or in a dedicated score manager
+            // Update score display if lines were cleared
+            if (result.clearedLines > 0) {
+                this.renderer.updateScore(this.gameState.score);
+                console.log(`GameLogic: ${result.clearedLines} lines cleared, score updated to ${this.gameState.score}`);
+            }
             this.spawnNewTetromino();
         }
 
@@ -152,6 +171,10 @@ export class GameLogic {
                 this.handleGeneralGameOver();
                 return;
             }
+            
+            // Reset manipulation flag to allow player control of new piece
+            this.gameState.canManipulatePiece = true;
+            
             if (result.landed) {
                 this.scene.startLockDelayTimer();
             } else {
@@ -165,9 +188,18 @@ export class GameLogic {
         if (!this.gameState.canManipulatePiece || !this.gameState.currentTetromino) return;
         const result = this.physics.performHardDrop();
         
+        // Update score display for hard drop points
+        this.renderer.updateScore(this.gameState.score);
+        
         if (result.gameOver) {
             this.handleGeneralGameOver();
             return;
+        }
+
+        // Update score display again if lines were cleared
+        if (result.clearedLines > 0) {
+            this.renderer.updateScore(this.gameState.score);
+            console.log(`GameLogic: Hard drop + ${result.clearedLines} lines cleared, score updated to ${this.gameState.score}`);
         }
 
         // After a hard drop, a new piece is spawned immediately.
@@ -182,5 +214,42 @@ export class GameLogic {
     private checkForCompletedLines(): number {
         // Implementation of checkForCompletedLines method
         return 0; // Placeholder return, actual implementation needed
+    }
+
+    public moveAllTheWayLeft(): void {
+        if (!this.gameState.canManipulatePiece || !this.gameState.currentTetromino) return;
+        const result = this.physics.moveAllTheWayLeft();
+        if (result.success) {
+            if (this.gameState.isPieceLanded) {
+                this.scene.startLockDelayTimer();
+            } else if (!result.landed) {
+                this.scene.cancelLockDelayTimer();
+            }
+            this.renderer.drawGame();
+        }
+    }
+
+    public moveAllTheWayRight(): void {
+        if (!this.gameState.canManipulatePiece || !this.gameState.currentTetromino) return;
+        const result = this.physics.moveAllTheWayRight();
+        if (result.success) {
+            if (this.gameState.isPieceLanded) {
+                this.scene.startLockDelayTimer();
+            } else if (!result.landed) {
+                this.scene.cancelLockDelayTimer();
+            }
+            this.renderer.drawGame();
+        }
+    }
+
+    public moveToBottom(): void {
+        if (!this.gameState.canManipulatePiece || !this.gameState.currentTetromino) return;
+        const wasLanded = this.gameState.isPieceLanded;
+        const result = this.physics.moveToBottom();
+
+        if (result.landed && !wasLanded) {
+            this.scene.startLockDelayTimer();
+        }
+        this.renderer.drawGame();
     }
 } 

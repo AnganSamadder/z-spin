@@ -6,6 +6,7 @@ import { InputHandler } from '../modules/input/InputHandler';
 import { GameRenderer } from '../modules/rendering/GameRenderer';
 import { GameLogic } from '../modules/logic/GameLogic';
 import { WasmEngine } from '../modules/wasm/WasmEngine';
+import WasmLoader from '../modules/wasm/WasmLoader';
 import {
     BLOCK_SIZE,
 } from '../constants';
@@ -20,6 +21,7 @@ export class GameScene extends Phaser.Scene {
     private wasmEngine!: WasmEngine;
     public isWasmActive: boolean = false;
     private wasmToggleButton: HTMLButtonElement | null = null;
+    private wasmDebugButton: HTMLButtonElement | null = null;
 
     private lockDelayTimer: Phaser.Time.TimerEvent | null = null;
     private lockDelayDuration: number = 500;
@@ -43,15 +45,20 @@ export class GameScene extends Phaser.Scene {
         
         // Initialize the WASM engine
         this.wasmEngine = new WasmEngine(this);
-        this.wasmEngine.initialize().then(success => {
-            if (success) {
-                this.setupWasmToggleButton();
-                console.log('WASM engine initialized successfully!');
-            } else {
-                console.warn('WASM engine initialization failed. WASM features will be disabled.');
-            }
+        const wasmLoader = WasmLoader.getInstance();
+        wasmLoader.loadWasmModule().then(() => {
+            this.wasmEngine.initialize(wasmLoader).then(success => {
+                if (success) {
+                    this.setupWasmToggleButton();
+                    console.log('WASM engine initialized successfully!');
+                } else {
+                    console.warn('WASM engine initialization failed. WASM features will be disabled.');
+                }
+            }).catch(error => {
+                console.error('Error initializing WASM engine:', error);
+            });
         }).catch(error => {
-            console.error('Error initializing WASM engine:', error);
+            console.error('Error loading WASM module:', error);
         });
 
         this.updateFallTimerDelay(currentSettings.gravityValue);
@@ -131,8 +138,16 @@ export class GameScene extends Phaser.Scene {
     }
 
     public startLockDelayTimer(): void {
+        // Check if we've exceeded the maximum lock resets - if so, lock immediately
+        if (this.gameState.lockResetsCount >= this.gameState.maxLockResets) {
+            console.log(`Max lock resets (${this.gameState.maxLockResets}) reached, locking immediately`);
+            this.gameLogic.lockTetromino();
+            return;
+        }
+
         this.cancelLockDelayTimer();
-        if (this.gameState.currentTetromino) {
+        if (this.gameState.currentTetromino && this.gameState.isPieceLanded) {
+            this.gameState.lockResetsCount++;
             this.lockDelayTimer = this.time.delayedCall(this.lockDelayDuration, this.onLockDelayEnd, [], this);
         }
     }
@@ -147,9 +162,11 @@ export class GameScene extends Phaser.Scene {
     private onLockDelayEnd(): void {
         this.lockDelayTimer = null;
         if (this.gameState.currentTetromino && this.gameState.isPieceLanded) {
+            // Double-check the piece is still colliding downward (landed)
             if (this.gameLogic.physics.checkCollision(this.gameState.currentTetromino.x, this.gameState.currentTetromino.y + 1, this.gameState.currentTetromino.shape)) {
                 this.gameLogic.lockTetromino();
             } else {
+                // Piece is no longer landed, reset the land state
                 this.gameState.isPieceLanded = false;
                 this.gameState.lockResetsCount = 0;
             }
@@ -173,6 +190,19 @@ export class GameScene extends Phaser.Scene {
         this.wasmToggleButton.addEventListener('click', () => {
             this.toggleWasmEngine();
         });
+
+        // Setup debug button
+        this.wasmDebugButton = document.getElementById('wasmDebugBtn') as HTMLButtonElement;
+        
+        if (!this.wasmDebugButton) {
+            console.error('Could not find WASM debug button in HTML');
+            return;
+        }
+        
+        // Add event listener to the debug button
+        this.wasmDebugButton.addEventListener('click', () => {
+            this.debugNextMove();
+        });
     }
 
     private toggleWasmEngine(): void {
@@ -192,5 +222,32 @@ export class GameScene extends Phaser.Scene {
         } else {
             this.wasmEngine.deactivate();
         }
+    }
+
+    private debugNextMove(): void {
+        if (!this.wasmEngine) {
+            console.error('WASM engine not initialized');
+            return;
+        }
+
+        if (!this.gameState.currentTetromino) {
+            console.warn('No current tetromino to debug');
+            return;
+        }
+
+        console.log('🔬🔬🔬 DEBUG NEXT MOVE 🔬🔬🔬');
+        console.log('Current piece:', this.gameState.currentTetromino.typeKey);
+        console.log('Current board state:');
+        console.log('Board grid:');
+        for (let y = 0; y < 20; y++) {
+            let row = '';
+            for (let x = 0; x < 10; x++) {
+                row += this.gameState.board[y][x] !== 0 ? '█' : '·';
+            }
+            console.log(`Row ${y.toString().padStart(2)}: ${row}`);
+        }
+
+        // Call the WASM engine to get the best move with detailed logging
+        this.wasmEngine.getBestMoveDebug();
     }
 }

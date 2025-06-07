@@ -1,3 +1,10 @@
+export enum Strategy {
+    Balanced = 'Balanced',
+    Aggressive = 'Aggressive',
+    Defensive = 'Defensive',
+    TSpan = 'TSpan',
+}
+
 // Define GameSettings interface and default values
 export interface GameSettings {
     ghostPieceEnabled: boolean;
@@ -10,6 +17,7 @@ export interface GameSettings {
     masterVolume: number;
     sfxVolume: number;
     musicVolume: number;
+    aiStrategy: Strategy;
     keybinds: {
         moveLeft: string[];
         moveRight: string[];
@@ -47,6 +55,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
     masterVolume: 0.7,
     sfxVolume: 0.8,
     musicVolume: 0.6,
+    aiStrategy: Strategy.Balanced,
     keybinds: {
         moveLeft: ['ArrowLeft', 'KeyA'],
         moveRight: ['ArrowRight', 'KeyD'],

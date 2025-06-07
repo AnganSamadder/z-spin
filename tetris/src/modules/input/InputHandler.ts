@@ -118,6 +118,13 @@ export class InputHandler {
 
         if (this.scene.gameState.gameOver || !this.scene.gameState.canManipulatePiece || !this.scene.gameState.currentTetromino || !this.input?.keyboard) return;
 
+        // Handle single-press actions, including SDF=Infinity
+        if (this.actionKeyObjects.softDrop?.some(k => Phaser.Input.Keyboard.JustDown(k))) {
+            if (this.sdf === Infinity) {
+                this.scene.gameLogic.moveToBottom();
+            }
+        }
+
         for (const action of this.singlePressActions) {
             let actionTriggered = false;
             if (this.actionKeyObjects[action]) {
@@ -143,9 +150,7 @@ export class InputHandler {
         let isRightPressed = this.actionKeyObjects.moveRight?.some(k => k.isDown) ?? false;
         
         if (isDownPressed) {
-            if (this.sdf === Infinity) {
-                this.scene.gameLogic.moveBlockDown(true);
-            } else if (this.sdf > 0) {
+            if (this.sdf > 0 && this.sdf !== Infinity) {
                 const softDropDelay = this.gravityValue / this.sdf;
                 if (time - this.lastSoftDropTime > softDropDelay) {
                     this.scene.gameLogic.moveBlockDown(true);
@@ -165,11 +170,14 @@ export class InputHandler {
                 if (!this.isDasActiveRight && this.dasTimerRight >= this.das) {
                     this.isDasActiveRight = true;
                     this.arrTimer = 0;
+                    if (this.arr === 0) {
+                        this.scene.gameLogic.moveAllTheWayRight();
+                    }
                 }
 
                 if (this.isDasActiveRight) {
                     this.arrTimer += delta;
-                    if (this.arrTimer >= this.arr) {
+                    if (this.arr > 0 && this.arrTimer >= this.arr) {
                         this.scene.gameLogic.moveBlockRight();
                         this.arrTimer = 0;
                     }
@@ -194,11 +202,14 @@ export class InputHandler {
                 if (!this.isDasActiveLeft && this.dasTimerLeft >= this.das) {
                     this.isDasActiveLeft = true;
                     this.arrTimer = 0;
+                    if (this.arr === 0) {
+                        this.scene.gameLogic.moveAllTheWayLeft();
+                    }
                 }
 
                 if (this.isDasActiveLeft) {
                     this.arrTimer += delta;
-                    if (this.arrTimer >= this.arr) {
+                    if (this.arr > 0 && this.arrTimer >= this.arr) {
                         this.scene.gameLogic.moveBlockLeft();
                         this.arrTimer = 0;
                     }
@@ -211,19 +222,6 @@ export class InputHandler {
         } else {
             this.isDasActiveLeft = false;
             this.dasTimerLeft = 0;
-        }
-
-        if (isDownPressed) {
-            if (this.sdf === 0) {
-                 this.scene.gameLogic.performHardDrop();
-            } else if (this.sdf === Infinity) {
-                this.scene.gameLogic.moveBlockDown(true);
-            } else {
-                if (time - this.lastSoftDropTime > this.sdf) {
-                    this.scene.gameLogic.moveBlockDown(true);
-                    this.lastSoftDropTime = time;
-                }
-            }
         }
     }
 } 

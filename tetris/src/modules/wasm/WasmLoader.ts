@@ -120,6 +120,13 @@ class WasmLoader {
     'L': 6
   };
 
+  public static readonly STRATEGY_MAP: { [key: string]: number } = {
+    'Balanced': 0,
+    'Aggressive': 1,
+    'Defensive': 2,
+    'TSpan': 3,
+  };
+
   private constructor() {}
 
   public static getInstance(): WasmLoader {
@@ -153,13 +160,13 @@ class WasmLoader {
       this.log('Loading WASM module');
       
       // First check if the WASM binary is accessible
-      const wasmBinaryResponse = await fetch('/static/z_spin_engine_bg.wasm');
+      const wasmBinaryResponse = await fetch('/wasm/z_spin_engine_bg.wasm');
       if (!wasmBinaryResponse.ok) {
         throw new Error(`Failed to fetch WASM binary: ${wasmBinaryResponse.status} ${wasmBinaryResponse.statusText}`);
       }
       
       // Now load the JS module
-      const jsModuleResponse = await fetch('/static/z_spin_engine.js');
+      const jsModuleResponse = await fetch('/wasm/z_spin_engine.js');
       if (!jsModuleResponse.ok) {
         throw new Error(`Failed to fetch JS module: ${jsModuleResponse.status} ${jsModuleResponse.statusText}`);
       }
@@ -183,7 +190,7 @@ class WasmLoader {
       
       // Initialize the WASM module
       this.log('Initializing WASM module');
-      this.wasmInitPromise = wasmModule.default('/static/z_spin_engine_bg.wasm');
+      this.wasmInitPromise = wasmModule.default('/wasm/z_spin_engine_bg.wasm');
       const initialized = await this.wasmInitPromise;
       
       this.log('WASM module initialized', {
