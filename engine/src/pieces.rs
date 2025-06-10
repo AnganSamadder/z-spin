@@ -2,6 +2,51 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use crate::board::BOARD_WIDTH;
 
+// SRS Wall Kick Tables
+static KICK_DATA_JLSTZ: Lazy<HashMap<String, Vec<(i32, i32)>>> = Lazy::new(|| {
+    let mut kicks = HashMap::new();
+    
+    // Basic rotations (0->1, 1->2, 2->3, 3->0)
+    kicks.insert("0->1".to_string(), vec![(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)]);
+    kicks.insert("1->0".to_string(), vec![(0, 0), (1, 0), (1, -1), (0, 2), (1, 2)]);
+    kicks.insert("1->2".to_string(), vec![(0, 0), (1, 0), (1, -1), (0, 2), (1, 2)]);
+    kicks.insert("2->1".to_string(), vec![(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)]);
+    kicks.insert("2->3".to_string(), vec![(0, 0), (1, 0), (1, -1), (0, 2), (1, 2)]);
+    kicks.insert("3->2".to_string(), vec![(0, 0), (-1, 0), (-1, -1), (0, 2), (-1, 2)]);
+    kicks.insert("3->0".to_string(), vec![(0, 0), (-1, 0), (-1, -1), (0, 2), (-1, 2)]);
+    kicks.insert("0->3".to_string(), vec![(0, 0), (1, 0), (1, 1), (0, -2), (1, -2)]);
+    
+    // 180 degree rotations
+    kicks.insert("0->2".to_string(), vec![(0, 0), (1, 0), (1, 1), (0, 1), (1, -1), (0, -1)]);
+    kicks.insert("1->3".to_string(), vec![(0, 0), (0, 1), (-1, 1), (-1, 0), (-1, 2), (0, 2)]);
+    kicks.insert("2->0".to_string(), vec![(0, 0), (-1, 0), (-1, -1), (0, -1), (-1, 1), (0, 1)]);
+    kicks.insert("3->1".to_string(), vec![(0, 0), (0, -1), (1, -1), (1, 0), (1, -2), (0, -2)]);
+    
+    kicks
+});
+
+static KICK_DATA_I: Lazy<HashMap<String, Vec<(i32, i32)>>> = Lazy::new(|| {
+    let mut kicks = HashMap::new();
+    
+    // Basic rotations
+    kicks.insert("0->1".to_string(), vec![(0, 0), (-2, 0), (1, 0), (-2, -1), (1, 2)]);
+    kicks.insert("1->0".to_string(), vec![(0, 0), (2, 0), (-1, 0), (2, 1), (-1, -2)]);
+    kicks.insert("1->2".to_string(), vec![(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)]);
+    kicks.insert("2->1".to_string(), vec![(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)]);
+    kicks.insert("2->3".to_string(), vec![(0, 0), (-1, 0), (2, 0), (-1, -2), (2, -2)]);
+    kicks.insert("3->2".to_string(), vec![(0, 0), (2, 0), (-1, 0), (2, 1), (-1, 1)]);
+    kicks.insert("3->0".to_string(), vec![(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)]);
+    kicks.insert("0->3".to_string(), vec![(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)]);
+    
+    // 180 degree rotations
+    kicks.insert("0->2".to_string(), vec![(0, 0), (-1, 0), (2, 0), (-1, -1), (2, -1)]);
+    kicks.insert("1->3".to_string(), vec![(0, 0), (0, 1), (0, -2), (2, 1), (-1, 1)]);
+    kicks.insert("2->0".to_string(), vec![(0, 0), (1, 0), (-2, 0), (1, 1), (-2, 1)]);
+    kicks.insert("3->1".to_string(), vec![(0, 0), (0, -1), (0, 2), (-2, -1), (1, -1)]);
+    
+    kicks
+});
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PieceType {
     I = 0, O = 1, T = 2, S = 3, Z = 4, J = 5, L = 6,
@@ -71,23 +116,88 @@ impl Piece {
         }
     }
 
-    pub fn rotated(&self, clockwise: bool) -> Self {
+    // New kick-aware rotation methods
+    pub fn try_rotate_clockwise(&self, board: &crate::board::Board) -> Option<Self> {
+        self.try_rotate_internal(true, board)
+    }
+    
+    pub fn try_rotate_counter_clockwise(&self, board: &crate::board::Board) -> Option<Self> {
+        self.try_rotate_internal(false, board)
+    }
+    
+    pub fn try_rotate_180(&self, board: &crate::board::Board) -> Option<Self> {
+        let new_rotation = (self.rotation + 2) % 4;
+        let kick_key = format!("{}->{}", self.rotation, new_rotation);
+        
+        let kicks = match self.piece_type {
+            PieceType::I => &KICK_DATA_I,
+            PieceType::O => return None, // O piece doesn't rotate
+            _ => &KICK_DATA_JLSTZ,
+        };
+        
+        if let Some(kick_offsets) = kicks.get(&kick_key) {
+            for (kick_index, &(dx, dy)) in kick_offsets.iter().enumerate() {
+                let test_piece = Self {
+                    piece_type: self.piece_type,
+                    x: self.x + dx,
+                    y: self.y - dy, // SRS y-kicks are inverted for board coordinates
+                    rotation: new_rotation,
+                };
+                
+                if board.can_place_piece(&test_piece) {
+                    // Log when a kick is used for 180 rotations
+                    if kick_index > 0 {
+                        crate::console_log!("🔄 180° KICK APPLIED: {:?} {} -> {} at ({},{}) with kick #{} offset ({},{})", 
+                            self.piece_type, self.rotation, new_rotation, self.x, self.y, kick_index, dx, dy);
+                    }
+                    return Some(test_piece);
+                }
+            }
+        }
+        
+        None
+    }
+    
+    fn try_rotate_internal(&self, clockwise: bool, board: &crate::board::Board) -> Option<Self> {
+        // O piece doesn't rotate
+        if self.piece_type == PieceType::O {
+            return None;
+        }
+        
         let new_rotation = if clockwise {
             (self.rotation + 1) % 4
         } else {
             (self.rotation + 3) % 4
         };
-        Self {
-            rotation: new_rotation,
-            ..*self
+        
+        let kick_key = format!("{}->{}", self.rotation, new_rotation);
+        
+        let kicks = match self.piece_type {
+            PieceType::I => &KICK_DATA_I,
+            _ => &KICK_DATA_JLSTZ,
+        };
+        
+        if let Some(kick_offsets) = kicks.get(&kick_key) {
+            for (kick_index, &(dx, dy)) in kick_offsets.iter().enumerate() {
+                let test_piece = Self {
+                    piece_type: self.piece_type,
+                    x: self.x + dx,
+                    y: self.y - dy, // SRS y-kicks are inverted for board coordinates
+                    rotation: new_rotation,
+                };
+                
+                if board.can_place_piece(&test_piece) {
+                    // Log when a kick is used (kick_index > 0 means we used a kick, not just basic rotation)
+                    if kick_index > 0 {
+                        crate::console_log!("🔄 KICK APPLIED: {:?} {} -> {} at ({},{}) with kick #{} offset ({},{})", 
+                            self.piece_type, self.rotation, new_rotation, self.x, self.y, kick_index, dx, dy);
+                    }
+                    return Some(test_piece);
+                }
+            }
         }
-    }
-
-    pub fn rotated_180(&self) -> Self {
-        Self {
-            rotation: (self.rotation + 2) % 4,
-            ..*self
-        }
+        
+        None
     }
 }
 

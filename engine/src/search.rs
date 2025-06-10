@@ -116,21 +116,37 @@ impl SearchEngine {
             visited.insert((start_piece.x, start_piece.y, start_piece.rotation));
         }
     
+        console_log!("🔍 Generating placements for {:?} piece...", piece_type);
+        let mut total_kick_rotations = 0;
+        let mut total_basic_moves = 0;
+    
         while let Some(piece) = queue.pop_front() {
             // Check if landed
             if !board.can_place_piece(&piece.moved(0, 1)) {
                 placements.insert(Placement::new(piece.x, piece.y, piece.rotation));
             }
     
-            // Successor states
-            let moves = [
+            // Successor states with kick-aware rotations
+            let mut moves = vec![
                 piece.moved(0, 1),   // Soft Drop
                 piece.moved(1, 0),   // Right
                 piece.moved(-1, 0),  // Left
-                piece.rotated(true), // CW
-                piece.rotated(false),// CCW
-                piece.rotated_180(), // 180
             ];
+            total_basic_moves += 3;
+            
+            // Add kick-aware rotations
+            if let Some(cw_piece) = piece.try_rotate_clockwise(board) {
+                moves.push(cw_piece);
+                total_kick_rotations += 1;
+            }
+            if let Some(ccw_piece) = piece.try_rotate_counter_clockwise(board) {
+                moves.push(ccw_piece);
+                total_kick_rotations += 1;
+            }
+            if let Some(rot180_piece) = piece.try_rotate_180(board) {
+                moves.push(rot180_piece);
+                total_kick_rotations += 1;
+            }
     
             for next_piece in &moves {
                 if visited.insert((next_piece.x, next_piece.y, next_piece.rotation)) {
@@ -140,8 +156,12 @@ impl SearchEngine {
                 }
             }
         }
+        
+        let final_placements: Vec<Placement> = placements.into_iter().collect();
+        console_log!("✅ Found {} total placements for {:?} (explored {} kick rotations, {} basic moves)", 
+                     final_placements.len(), piece_type, total_kick_rotations, total_basic_moves);
     
-        placements.into_iter().collect()
+        final_placements
     }
 
     fn evaluate_placement(&self, board: &Board, piece_type: PieceType, placement: &Placement, weights: &EvaluationWeights) -> Option<PlacementEvaluation> {
@@ -212,10 +232,18 @@ impl SearchEngine {
             
             let mut moves: Vec<(Piece, &str, usize)> = Vec::new();
             
-            // Basic moves - with adjusted costs to prioritize horizontal movement first
-            moves.push((piece.rotated(true), "rotate", 5));          // Low cost - do rotations first
-            moves.push((piece.rotated(false), "rotate_ccw", 5));     // Low cost - do rotations first  
-            moves.push((piece.rotated_180(), "rotate_180", 5));      // Low cost - do rotations first
+            // Kick-aware rotation moves - these will automatically handle kicks and land where they can
+            if let Some(cw_piece) = piece.try_rotate_clockwise(board) {
+                moves.push((cw_piece, "rotate", 5));
+            }
+            if let Some(ccw_piece) = piece.try_rotate_counter_clockwise(board) {
+                moves.push((ccw_piece, "rotate_ccw", 5));
+            }
+            if let Some(rot180_piece) = piece.try_rotate_180(board) {
+                moves.push((rot180_piece, "rotate_180", 5));
+            }
+            
+            // Basic movement moves
             moves.push((piece.moved(-1, 0), "move_left", 8));        // Medium cost - horizontal moves
             moves.push((piece.moved(1, 0), "move_right", 8));        // Medium cost - horizontal moves
             
