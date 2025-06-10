@@ -11,9 +11,11 @@ import { TetrominoState, HeldTetrominoState } from '../../types';
 
 export class Physics {
     private gameState: GameState;
+    private scene?: any; // Optional scene reference for accessing renderer
 
-    constructor(gameState: GameState) {
+    constructor(gameState: GameState, scene?: any) {
         this.gameState = gameState;
+        this.scene = scene;
     }
 
     public checkCollision(pivotBoardX: number, pivotBoardY: number, shape: number[][], pieceTypeKey?: keyof typeof TETROMINOES): boolean {
@@ -180,7 +182,7 @@ export class Physics {
         return { landed: this.gameState.isPieceLanded };
     }
 
-    public performHardDrop(): { clearedLines: number, gameOver: boolean } {
+    public performHardDrop(): { clearedLines: number, gameOver: boolean, displayInfo?: { clearType: string, b2bCount: number, comboCount: number } } {
         if (!this.gameState.currentTetromino) return { clearedLines: 0, gameOver: this.gameState.gameOver };
         let distance = 0;
         while (!this.checkCollision(this.gameState.currentTetromino.x, this.gameState.currentTetromino.y + 1, this.gameState.currentTetromino.shape)) {
@@ -194,10 +196,10 @@ export class Physics {
             return { clearedLines: 0, gameOver: true };
         }
 
-        return { clearedLines: lockResult.clearedLines, gameOver: false };
+        return { clearedLines: lockResult.clearedLines, gameOver: false, displayInfo: lockResult.displayInfo };
     }
 
-    public lockTetromino(): { clearedLines: number, gameOver: boolean } {
+    public lockTetromino(): { clearedLines: number, gameOver: boolean, displayInfo?: { clearType: string, b2bCount: number, comboCount: number } } {
         if (!this.gameState.currentTetromino) return { clearedLines: 0, gameOver: this.gameState.gameOver };
 
         const { shape, x: pivotBoardX, y: pivotBoardY, color, typeKey } = this.gameState.currentTetromino;
@@ -227,14 +229,26 @@ export class Physics {
             return { clearedLines: 0, gameOver: true };
         }
 
-        const clearedLines = this.checkForCompletedLines();
+        const { clearedLines, displayInfo } = this.checkForCompletedLinesWithDisplay();
         this.gameState.currentTetromino = null;
         this.gameState.canHold = true;
         
-        return { clearedLines, gameOver: this.gameState.gameOver };
+        return { clearedLines, gameOver: this.gameState.gameOver, displayInfo };
     }
 
     private checkForCompletedLines(): number {
+        const { clearedLines } = this.checkForCompletedLinesWithDisplay();
+        return clearedLines;
+    }
+
+    private checkForCompletedLinesWithDisplay(): { clearedLines: number, displayInfo?: { clearType: string, b2bCount: number, comboCount: number } } {
+        // Check for spin BEFORE clearing lines (crucial for T-spin detection)
+        const spinInfo = this.detectSpin();
+        let shouldCheckForSpin = false;
+        if (spinInfo.isSpin || this.gameState.lastAction === 'rotate') {
+            shouldCheckForSpin = true;
+        }
+        
         let linesCleared = 0;
         let y = LOGICAL_BOARD_HEIGHT_BLOCKS - 1;
         while (y >= 0) {
@@ -248,31 +262,210 @@ export class Physics {
         }
 
         if (linesCleared > 0) {
-            // Standard Tetris scoring system
-            let baseScore = 0;
+            return this.updateScoringAndGetDisplayInfo(linesCleared, spinInfo, shouldCheckForSpin);
+        } else {
+            // Check for any spin even with no lines cleared (only if we detected a spin before clearing)
+            if (shouldCheckForSpin && spinInfo.isSpin) {
+                // Any spin without clear gets scoring (but only T-spins show text)
+                return this.updateScoringAndGetDisplayInfo(0, spinInfo, shouldCheckForSpin);
+            } else {
+                // No lines cleared and no spin - break combo but keep B2B if it exists
+                this.gameState.comboCount = 0;
+                return { clearedLines: 0 };
+            }
+        }
+    }
+
+    private updateScoringAndGetDisplayInfo(linesCleared: number, spinInfo?: { isSpin: boolean, pieceType: string }, shouldCheckForSpin?: boolean): { clearedLines: number, displayInfo: { clearType: string, b2bCount: number, comboCount: number } } {
+        // Check if it's a perfect clear (board is completely empty after line clear)
+        const isPerfectClear = this.isEmptyBoard();
+        
+        // Determine line clear type and if it's "difficult" (maintains B2B)
+        const { clearType, isDifficultClear, baseScore } = this.getClearTypeAndScore(linesCleared, isPerfectClear, spinInfo, shouldCheckForSpin);
+        
+        // Update combo count
+        this.gameState.comboCount++;
+        
+        // Update B2B state
+        if (isDifficultClear) {
+            if (this.gameState.backToBackActive) {
+                this.gameState.backToBackCount++;
+            } else {
+                this.gameState.backToBackActive = true;
+                this.gameState.backToBackCount = 2; // Start at 2 for display purposes
+            }
+        } else {
+            // Non-difficult clear breaks B2B
+            this.gameState.backToBackActive = false;
+            this.gameState.backToBackCount = 0;
+        }
+        
+        // Calculate final score with bonuses
+        let finalScore = baseScore;
+        
+        // Apply B2B bonus (1.5x multiplier)
+        if (this.gameState.backToBackActive && isDifficultClear && this.gameState.backToBackCount >= 2) {
+            finalScore = Math.floor(finalScore * 1.5);
+        }
+        
+        // Apply combo bonus (50 points per combo level)
+        if (this.gameState.comboCount > 1) {
+            finalScore += (this.gameState.comboCount - 1) * 50;
+        }
+        
+        // Apply perfect clear bonus (massive bonus)
+        if (isPerfectClear) {
+            finalScore += 3500; // Flat bonus for perfect clear
+        }
+        
+        // Add to total score
+        this.gameState.score += finalScore;
+        
+        // Return display info instead of directly showing it
+        const displayClearType = isPerfectClear ? 'PERFECT CLEAR!' : clearType;
+        return {
+            clearedLines: linesCleared,
+            displayInfo: {
+                clearType: displayClearType,
+                b2bCount: this.gameState.backToBackCount,
+                comboCount: this.gameState.comboCount
+            }
+        };
+    }
+
+    private isEmptyBoard(): boolean {
+        for (let y = 0; y < LOGICAL_BOARD_HEIGHT_BLOCKS; y++) {
+            for (let x = 0; x < BOARD_WIDTH_BLOCKS; x++) {
+                if (this.gameState.board[y][x] !== null) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private getClearTypeAndScore(linesCleared: number, isPerfectClear: boolean, spinInfo?: { isSpin: boolean, pieceType: string }, shouldCheckForSpin?: boolean): { clearType: string, isDifficultClear: boolean, baseScore: number } {
+        let clearType = '';
+        let isDifficultClear = false;
+        let baseScore = 0;
+        
+        if (spinInfo && spinInfo.isSpin) {
+            // All spins are difficult and maintain B2B
+            isDifficultClear = true;
+            
+            const spinPrefix = `${spinInfo.pieceType}-SPIN`;
+            
+            if (linesCleared === 0) {
+                clearType = spinPrefix;
+                baseScore = 100; // Spin without clear
+            } else {
+                switch (linesCleared) {
+                    case 1:
+                        clearType = `${spinPrefix} SINGLE`;
+                        baseScore = spinInfo.pieceType === 'T' ? 200 : 100; // T-spins worth more
+                        break;
+                    case 2:
+                        clearType = `${spinPrefix} DOUBLE`;
+                        baseScore = spinInfo.pieceType === 'T' ? 600 : 300;
+                        break;
+                    case 3:
+                        clearType = `${spinPrefix} TRIPLE`;
+                        baseScore = spinInfo.pieceType === 'T' ? 1200 : 500;
+                        break;
+                    case 4:
+                        clearType = `${spinPrefix} TETRIS`;
+                        baseScore = spinInfo.pieceType === 'T' ? 1600 : 800;
+                        break;
+                    default:
+                        clearType = `${spinPrefix} ${linesCleared} LINES`;
+                        baseScore = linesCleared * (spinInfo.pieceType === 'T' ? 400 : 200);
+                        break;
+                }
+            }
+        } else {
+            // Regular line clears
             switch (linesCleared) {
                 case 1:
-                    baseScore = 100; // Single
+                    clearType = 'SINGLE';
+                    isDifficultClear = false;
+                    baseScore = 100;
                     break;
                 case 2:
-                    baseScore = 300; // Double
+                    clearType = 'DOUBLE';
+                    isDifficultClear = false;
+                    baseScore = 300;
                     break;
                 case 3:
-                    baseScore = 500; // Triple
+                    clearType = 'TRIPLE';
+                    isDifficultClear = false;
+                    baseScore = 500;
                     break;
                 case 4:
-                    baseScore = 800; // Tetris
+                    clearType = 'TETRIS';
+                    isDifficultClear = true; // Tetris maintains B2B
+                    baseScore = 800;
                     break;
                 default:
-                    baseScore = linesCleared * 100; // Fallback for unusual cases
+                    clearType = `${linesCleared} LINES`;
+                    isDifficultClear = false;
+                    baseScore = linesCleared * 100;
                     break;
             }
-            
-            // In a full Tetris implementation, you might multiply by level
-            // For now, we'll use the base score
-            this.gameState.score += baseScore;
         }
-        return linesCleared;
+        
+        return { clearType, isDifficultClear, baseScore };
+    }
+
+    // Comprehensive spin detection for all piece types
+    private detectSpin(): { isSpin: boolean, pieceType: string } {
+        if (!this.gameState.currentTetromino) {
+            return { isSpin: false, pieceType: '' };
+        }
+        
+        // Only check for spin if the last action was a rotation
+        if (this.gameState.lastAction !== 'rotate') {
+            return { isSpin: false, pieceType: '' };
+        }
+        
+        const pieceType = this.gameState.currentTetromino.typeKey;
+        
+        // Only check for spins on pieces that can spin (not O-piece)
+        if (pieceType === 'O') {
+            return { isSpin: false, pieceType: '' };
+        }
+        
+        const isSpin = this.checkSpinCondition(this.gameState.currentTetromino);
+        return { isSpin, pieceType };
+    }
+
+    // Unified spin detection using 3-corner rule (works for all pieces)
+    private checkSpinCondition(piece: { x: number, y: number, typeKey: string, rotation: number }): boolean {
+        if (piece.typeKey !== 'T') return false;
+
+        const corners = [
+            { x: piece.x - 1, y: piece.y - 1 }, // Top-left
+            { x: piece.x + 1, y: piece.y - 1 }, // Top-right
+            { x: piece.x - 1, y: piece.y + 1 }, // Bottom-left
+            { x: piece.x + 1, y: piece.y + 1 }  // Bottom-right
+        ];
+
+        let filledCorners = 0;
+        for (const corner of corners) {
+            const isOutOfBounds = corner.x < 0 || corner.x >= 10 || corner.y < 0 || corner.y >= LOGICAL_BOARD_HEIGHT_BLOCKS;
+            const hasBlock = !isOutOfBounds && corner.y < this.gameState.board.length && this.gameState.board[corner.y][corner.x] !== null;
+            
+            if (isOutOfBounds || hasBlock) {
+                filledCorners++;
+            }
+        }
+
+        return filledCorners >= 3;
+    }
+
+    // Keep the old isTSpin method for backward compatibility, but use the new system
+    private isTSpin(): boolean {
+        const spinInfo = this.detectSpin();
+        return spinInfo.isSpin && spinInfo.pieceType === 'T';
     }
 
     public spawnNewTetromino(): { success: boolean; landed: boolean, gameOver: boolean } {

@@ -75,7 +75,16 @@ export class GameRenderer {
 
     public showComboText(clearType: string, b2bCount: number, comboCount: number): void {
         if (clearType) {
-            this.comboText.setText(clearType).setVisible(true);
+            // Format T-spin text with line breaks
+            let displayText = clearType;
+            if (clearType.includes('T-SPIN')) {
+                // Replace "T-SPIN SINGLE/DOUBLE/TRIPLE" with "T-SPIN\nSINGLE/DOUBLE/TRIPLE"
+                displayText = clearType.replace('T-SPIN SINGLE', 'T-SPIN\nSINGLE');
+                displayText = displayText.replace('T-SPIN DOUBLE', 'T-SPIN\nDOUBLE');
+                displayText = displayText.replace('T-SPIN TRIPLE', 'T-SPIN\nTRIPLE');
+                // Keep "T-SPIN" (no clear) as is
+            }
+            this.comboText.setText(displayText).setVisible(true);
         } else {
             this.comboText.setVisible(false);
         }

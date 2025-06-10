@@ -77,16 +77,26 @@ impl SearchEngine {
             if debug {
                 console_log!("🧠 SMART DROP: Complex placement detected - allowing soft_drop in pathfinding");
             }
-            // Add hard_drop only if not already present in sequence
+            // For complex moves, soft_drop might be used during pathfinding, but we still want to end with hard_drop
+            // Add soft_drop only if no drop move is present in the sequence
             if !final_sequence.iter().any(|m| m == "hard_drop" || m == "soft_drop") {
                 final_sequence.push("soft_drop".to_string());
             }
         } else {
-            // Simple placement - pathfinding avoided soft_drop, just add hard_drop
+            // Simple placement - pathfinding avoided soft_drop
             if debug {
-                console_log!("🧠 SMART DROP: Simple placement detected - using hard_drop only");
+                console_log!("🧠 SMART DROP: Simple placement detected");
             }
+        }
+        
+        // ALWAYS end with hard_drop, but avoid duplicates
+        if !final_sequence.iter().any(|m| m == "hard_drop") {
             final_sequence.push("hard_drop".to_string());
+            if debug {
+                console_log!("🎯 FORCE FINISH: Added hard_drop to end sequence");
+            }
+        } else if debug {
+            console_log!("🎯 FORCE FINISH: Sequence already contains hard_drop");
         }
         
         let best_move = final_sequence.join(",");

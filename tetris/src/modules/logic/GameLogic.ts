@@ -22,7 +22,7 @@ export class GameLogic {
         this.scene = scene;
         this.gameState = gameState;
         this.renderer = renderer;
-        this.physics = new Physics(this.gameState);
+        this.physics = new Physics(this.gameState, this.scene);
     }
 
     public fillNextQueue(): void {
@@ -120,24 +120,17 @@ export class GameLogic {
         }
     }
 
-    public lockTetromino(): void {
-        if (!this.gameState.currentTetromino) return;
-        this.gameState.canManipulatePiece = false;
-        this.scene.cancelLockDelayTimer();
-        
+    public lockTetromino(): { clearedLines: number, gameOver: boolean, displayInfo?: { clearType: string, b2bCount: number, comboCount: number } } {
         const result = this.physics.lockTetromino();
         
         if (result.gameOver) {
-            this.handleGeneralGameOver();
-        } else {
-            // Update score display if lines were cleared
-            if (result.clearedLines > 0) {
-                this.renderer.updateScore(this.gameState.score);
-            }
-            this.spawnNewTetromino();
+            this.gameState.gameOver = true;
         }
 
-        this.renderer.drawGame();
+        this.gameState.currentTetromino = null;
+        this.spawnNewTetromino();
+
+        return result;
     }
 
     private handleGeneralGameOver(): void {
@@ -181,12 +174,30 @@ export class GameLogic {
             return;
         }
 
-        // Update score display again if lines were cleared
+        // Update score display again if lines were cleared and show scoring popups
         if (result.clearedLines > 0) {
             this.renderer.updateScore(this.gameState.score);
+            
+            // Show text for T-spins and special clears only (other spins are silent)
+            if (result.displayInfo && (
+                result.displayInfo.clearType.includes('T-SPIN') ||
+                result.displayInfo.clearType === 'TETRIS' ||
+                result.displayInfo.clearType.includes('PERFECT')
+            )) {
+                this.renderer.showComboText(
+                    result.displayInfo.clearType,
+                    result.displayInfo.b2bCount,
+                    result.displayInfo.comboCount
+                );
+                
+                // Hide the texts after a delay
+                this.scene.time.delayedCall(2000, () => {
+                    this.renderer.hideComboTexts();
+                });
+            }
         }
 
-        // After a hard drop, a new piece is spawned immediately.
+        // Immediate spawn like JSTRIS/TETR.IO
         this.spawnNewTetromino();
         this.renderer.drawGame();
     }

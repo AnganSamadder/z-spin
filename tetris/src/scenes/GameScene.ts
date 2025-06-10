@@ -212,6 +212,8 @@ export class GameScene extends Phaser.Scene {
         }
         
         this.isWasmActive = !this.isWasmActive;
+        this.gameState.isWasmMode = this.isWasmActive;
+        
         console.log(`WASM engine is now ${this.isWasmActive ? 'active' : 'inactive'}`);
         if (this.wasmToggleButton) {
             this.wasmToggleButton.textContent = this.isWasmActive ? 'Play JS Engine' : 'Play WASM Engine';
@@ -222,6 +224,9 @@ export class GameScene extends Phaser.Scene {
         } else {
             this.wasmEngine.deactivate();
         }
+        
+        console.log(`B2B state preserved: active=${this.gameState.backToBackActive}, count=${this.gameState.backToBackCount}`);
+        console.log(`Combo state preserved: ${this.gameState.comboCount}`);
     }
 
     private debugNextMove(): void {
@@ -233,18 +238,6 @@ export class GameScene extends Phaser.Scene {
         if (!this.gameState.currentTetromino) {
             console.warn('No current tetromino to debug');
             return;
-        }
-
-        console.log('🔬🔬🔬 DEBUG NEXT MOVE 🔬🔬🔬');
-        console.log('Current piece:', this.gameState.currentTetromino.typeKey);
-        console.log('Current board state:');
-        console.log('Board grid:');
-        for (let y = 0; y < 20; y++) {
-            let row = '';
-            for (let x = 0; x < 10; x++) {
-                row += this.gameState.board[y][x] !== 0 ? '█' : '·';
-            }
-            console.log(`Row ${y.toString().padStart(2)}: ${row}`);
         }
 
         // Call the WASM engine to get the best move with detailed logging

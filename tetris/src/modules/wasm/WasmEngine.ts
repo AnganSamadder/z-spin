@@ -88,56 +88,40 @@ export class WasmEngine {
       this.logInfo('WASM Engine not initialized for debug call');
       return;
     }
-    console.log('🔬🔬🔬 DEBUG NEXT MOVE 🔬🔬🔬');
+    
     const state = this.gameScene.gameState;
     if (!state.currentTetromino) {
-      console.log('No current piece to debug.');
       return;
     }
-    console.log('Current piece:', state.currentTetromino.typeKey);
 
     const settings: GameSettings = this.gameScene.registry.get('gameSettings') || DEFAULT_SETTINGS;
     const strategy = WasmLoader.STRATEGY_MAP[settings.aiStrategy];
-    
-    console.log('Current board state:');
     
     const board = state.board
       .slice(-20)
       .map(row => row.map(cell => cell === null ? 0 : 1))
       .flat();
       
-    console.log('🔍 Preparing WASM debug call...');
     const currentPieceTypeIndex = WasmLoader.TETROMINO_TYPE_MAP[state.currentTetromino.typeKey];
     const nextPieceTypeIndex = state.nextTetrominoQueue.length > 0 ? WasmLoader.TETROMINO_TYPE_MAP[state.nextTetrominoQueue[0].typeKey] : -1;
-    console.log('🎯 Current piece type index:', currentPieceTypeIndex);
-    console.log('🎯 Next piece type index:', nextPieceTypeIndex);
-    console.log('🎯 Board state array (flat):', board.slice(0, 40), `... (first 40 of ${board.length})`);
     
     // Enable logging, get the move, then disable it
     this.wasmEngine.configureLogging(true);
     const sequence = this.wasmEngine.get_full_move_sequence(board, currentPieceTypeIndex, nextPieceTypeIndex, strategy);
     this.wasmEngine.configureLogging(false);
     
-    console.log('🎯 Full move sequence for debug:', sequence);
-    console.log('🎯 Full move sequence:', sequence);
-    
     this.executeFullSequence(sequence);
-    console.log('🔬🔬🔬 DEBUG COMPLETE 🔬🔬🔬');
   }
 
   private executeFullSequence(sequence: string): void {
     const moves = sequence.split(',');
-    console.log('🎮 Executing move sequence:', moves);
     
     let index = 0;
     const executeNext = () => {
       if (index < moves.length) {
-        console.log(`🎮 Step ${index + 1}: ${moves[index]}`);
         this.executeMove(moves[index]);
         index++;
         setTimeout(executeNext, 150);
-      } else {
-        console.log('🎮 Sequence execution complete!');
       }
     };
     
@@ -238,5 +222,35 @@ export class WasmEngine {
     // Assuming you have a mapping from typeKey to color in your constants or theme
     const tetrominoData = TETROMINOES[typeKey as keyof typeof TETROMINOES];
     return tetrominoData ? tetrominoData.color : 0xFFFFFF;
+  }
+
+  public debugNextMove(): void {
+    if (!this.gameScene.gameState?.currentTetromino || !this.wasmEngine) {
+      return;
+    }
+
+    // Use the same board preparation logic as in getBestMoveDebug
+    const state = this.gameScene.gameState;
+    if (!state.currentTetromino) {
+      return;
+    }
+    
+    const board = state.board
+      .slice(-20)
+      .map(row => row.map(cell => cell === null ? 0 : 1))
+      .flat();
+      
+    const currentPieceTypeIndex = WasmLoader.TETROMINO_TYPE_MAP[state.currentTetromino.typeKey];
+    const nextPieceTypeIndex = state.nextTetrominoQueue.length > 0 ? WasmLoader.TETROMINO_TYPE_MAP[state.nextTetrominoQueue[0].typeKey] : -1;
+    
+    const settings: GameSettings = this.gameScene.registry.get('gameSettings') || DEFAULT_SETTINGS;
+    const strategy = WasmLoader.STRATEGY_MAP[settings.aiStrategy];
+    
+    // Enable logging, get the move, then disable it
+    this.wasmEngine.configureLogging(true);
+    const sequence = this.wasmEngine.get_full_move_sequence(board, currentPieceTypeIndex, nextPieceTypeIndex, strategy);
+    this.wasmEngine.configureLogging(false);
+    
+    this.executeFullSequence(sequence);
   }
 } 

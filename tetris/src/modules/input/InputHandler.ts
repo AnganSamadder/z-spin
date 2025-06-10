@@ -23,7 +23,7 @@ export class InputHandler {
     private phaserKeys: { [keyCode: string]: Phaser.Input.Keyboard.Key } = {};
     private actionKeyObjects: { [action: string]: Phaser.Input.Keyboard.Key[] } = {};
     private singlePressActions: Set<string> = new Set([
-        'rotateCW', 'rotateCCW', 'rotate180', 'hardDrop', 'holdPiece', 'resetGame', 'softDrop'
+        'rotateCW', 'rotateCCW', 'rotate180', 'hardDrop', 'holdPiece', 'resetGame'
     ]);
 
     private moveDelay: number = 70;
@@ -135,11 +135,6 @@ export class InputHandler {
                     case 'rotate180': this.scene.gameLogic.rotate('180'); break;
                     case 'hardDrop': this.scene.gameLogic.performHardDrop(); break;
                     case 'holdPiece': this.scene.gameLogic.performHold(); break;
-                    case 'softDrop':
-                        if (this.sdf === Infinity) {
-                            this.scene.gameLogic.moveToBottom();
-                        }
-                        break;
                 }
             }
         }
@@ -148,7 +143,15 @@ export class InputHandler {
         let isRightPressed = this.actionKeyObjects.moveRight?.some(k => k.isDown) ?? false;
         
         if (isDownPressed) {
-            if (this.sdf > 0 && this.sdf !== Infinity) {
+            if (this.sdf === Infinity) {
+                // When SDF is infinity, drop all the way to bottom instantly
+                // Modern Tetris standards: No delay for infinity SDF
+                if (time - this.lastSoftDropTime > 0) { // Prevent multiple calls in same frame
+                    this.scene.gameLogic.moveToBottom();
+                    this.lastSoftDropTime = time;
+                }
+            } else if (this.sdf > 0) {
+                // Normal SDF behavior - drop at calculated interval
                 const softDropDelay = this.gravityValue / this.sdf;
                 if (time - this.lastSoftDropTime > softDropDelay) {
                     this.scene.gameLogic.moveBlockDown(true);
