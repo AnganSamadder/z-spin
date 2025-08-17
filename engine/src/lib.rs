@@ -9,6 +9,8 @@ mod engine;
 
 use engine::TetrisEngine;
 use crate::evaluation::Strategy;
+use crate::board::Board;
+use crate::pieces::{PieceType, Piece};
 
 // Console.log for debugging
 #[wasm_bindgen]
@@ -61,6 +63,142 @@ impl WasmTetrisEngine {
 
     pub fn get_full_move_sequence(&mut self, board: Vec<i32>, current_piece: i32, next_piece: i32, strategy: Strategy) -> String {
         self.engine.get_full_move_sequence(&board, current_piece, next_piece, strategy)
+    }
+
+    // New methods that accept current piece position for accurate pathfinding
+    #[wasm_bindgen(js_name = getBestMoveWithPosition)]
+    pub fn get_best_move_with_position(&mut self, board: Vec<i32>, current_piece: i32, current_x: i32, current_y: i32, current_rotation: i32, next_piece: i32, strategy: Strategy) -> String {
+        console_log!("🎮 ENGINE: getBestMoveWithPosition called - piece: {}, position: ({}, {}) rotation: {}, next: {}", 
+                     current_piece, current_x, current_y, current_rotation, next_piece);
+        
+        // CRITICAL FIX: Handle buffer area coordinates properly
+        let (rust_x, rust_y) = if current_y < 20 {
+            // Piece is in buffer area (y=0-19) - convert to visible area coordinates
+            let visible_y = current_y + 20;
+            console_log!("🔧 COORDINATE MAPPING: JS buffer ({}, {}) → Rust visible ({}, {})", 
+                        current_x, current_y, current_x, visible_y);
+            (current_x, visible_y)
+        } else {
+            // Piece is in visible area (y=20-39) - use coordinates directly
+            console_log!("🔧 COORDINATE MAPPING: JS ({}, {}) → Rust ({}, {}) (direct mapping)", 
+                        current_x, current_y, current_x, current_y);
+            (current_x, current_y)
+        };
+        
+        // Create the board and validate coordinates
+        let rust_board = crate::board::Board::from_flat_array(&board);
+        let piece_type = crate::pieces::PieceType::from_i32(current_piece).unwrap_or(crate::pieces::PieceType::T);
+        let test_piece = crate::pieces::Piece::new(piece_type, rust_x, rust_y).with_rotation(current_rotation as usize);
+        
+        let final_coordinates = if !rust_board.can_place_piece(&test_piece) {
+            console_log!("🔄 Coordinates invalid, using spawn position fallback...");
+            let spawn_piece = crate::pieces::Piece::spawn(piece_type);
+            (spawn_piece.x, spawn_piece.y)
+        } else {
+            (rust_x, rust_y)
+        };
+        
+        // Convert next piece
+        let next_piece_type = crate::pieces::PieceType::from_i32(next_piece).unwrap_or(crate::pieces::PieceType::T);
+        
+        // Run the search using the engine's method with corrected coordinates
+        self.engine.get_best_move_with_position(&board, current_piece, final_coordinates.0, final_coordinates.1, current_rotation as usize, next_piece, strategy)
+    }
+
+    #[wasm_bindgen(js_name = getFullMoveSequenceWithPosition)]
+    pub fn get_full_move_sequence_with_position(&mut self, board: Vec<i32>, current_piece: i32, current_x: i32, current_y: i32, current_rotation: i32, next_piece: i32, strategy: Strategy) -> String {
+        console_log!("🎮 ENGINE: getFullMoveSequenceWithPosition called - piece: {}, position: ({}, {}) rotation: {}, next: {}", 
+                     current_piece, current_x, current_y, current_rotation, next_piece);
+        
+        // Condensed coordinate diagnostics
+        let board_rows = board.len() / 10;
+        console_log!("📐 Rows={} JSpos=({}, {})", board_rows, current_x, current_y);
+        
+        // CRITICAL FIX: Handle buffer area coordinates properly
+        let (rust_x, rust_y) = if current_y < 20 {
+            // Piece is in buffer area (y=0-19) - JavaScript only sent visible data (20 rows)
+            // We need to convert buffer coordinates to equivalent visible coordinates
+            console_log!("  🔧 BUFFER AREA DETECTED: JS y={} is in buffer (0-19)", current_y);
+            console_log!("  🔧 Converting to visible area coordinates...");
+            
+            // Map buffer y-coordinate to visible area
+            // If piece is at y=23 in buffer, it should be at y=43 in full coordinate system
+            // But since our board is only 40 rows, we need to offset appropriately
+            let visible_y = current_y + 20; // Convert buffer coordinate to visible coordinate
+            console_log!("  🔧 COORDINATE MAPPING: JS buffer ({}, {}) → Rust visible ({}, {})", 
+                        current_x, current_y, current_x, visible_y);
+            (current_x, visible_y)
+        } else {
+            // Piece is already in visible area (y=20-39) - use coordinates directly
+            console_log!("  🔧 COORDINATE MAPPING: JS ({}, {}) → Rust ({}, {}) (direct mapping - same coordinate space!)", 
+                        current_x, current_y, current_x, current_y);
+            (current_x, current_y)
+        };
+        
+        // Create the board from flat array (this maps JS data to Rust rows 20-39)
+        let rust_board = crate::board::Board::from_flat_array(&board);
+        
+        // Validate the converted coordinates
+        let piece_type = crate::pieces::PieceType::from_i32(current_piece).unwrap_or(crate::pieces::PieceType::T);
+        let test_piece = crate::pieces::Piece::new(piece_type, rust_x, rust_y).with_rotation(current_rotation as usize);
+        
+        // Concise piece creation debug
+        console_log!("🔍 Piece {:?} at ({}, {}) rot {}", piece_type, rust_x, rust_y, current_rotation);
+        let mask_result = test_piece.get_mask();
+        
+        match mask_result {
+            Some(_mask) => {
+                console_log!("✅ Mask OK for {:?} rot {} @({}, {})", piece_type, current_rotation, rust_x, rust_y);
+            },
+            None => {
+                console_log!("❌ No mask for {:?} rot {} @x={}", piece_type, current_rotation, rust_x);
+                for test_x in (rust_x-1)..=(rust_x+1) {
+                    let test_piece_nearby = crate::pieces::Piece::new(piece_type, test_x, rust_y).with_rotation(current_rotation as usize);
+                    if let Some(_) = test_piece_nearby.get_mask() {
+                        console_log!("  ✅ mask@x={}", test_x);
+                    }
+                }
+            }
+        }
+        
+        let is_valid = rust_board.can_place_piece(&test_piece);
+        
+        console_log!("🔍 Coord: ({}, {}) rot {} → {}", rust_x, rust_y, current_rotation, if is_valid { "✅ VALID" } else { "❌ INVALID" });
+        
+        // DETAILED VALIDATION ANALYSIS
+        if !is_valid {
+            console_log!("❌ Invalid start pos @({}, {}) - returning empty sequence", rust_x, rust_y);
+            return "ERROR:INVALID_POSITION".to_string();
+        }
+        
+        let final_coordinates = if !is_valid {
+            console_log!("  🔄 Coordinates invalid, using spawn position fallback...");
+            let spawn_piece = crate::pieces::Piece::spawn(piece_type);
+            console_log!("  ✅ Using spawn position: ({}, {})", spawn_piece.x, spawn_piece.y);
+            console_log!("  ⚠️  CRITICAL WARNING: This means JavaScript will execute from ({}, {}) but Rust pathfinding is from ({}, {})!", 
+                        current_x, current_y, spawn_piece.x, spawn_piece.y);
+            console_log!("  🔧 This coordinate mismatch will cause execution errors!");
+            (spawn_piece.x, spawn_piece.y)
+        } else {
+            console_log!("  ✅ Coordinates valid - no fallback needed");
+            (rust_x, rust_y)
+        };
+        
+        console_log!("🔧 Final: JS ({}, {}) → Rust ({}, {})", 
+                     current_x, current_y, final_coordinates.0, final_coordinates.1);
+        
+        // COORDINATE CONSISTENCY CHECK
+        if final_coordinates.0 != current_x || final_coordinates.1 != current_y {
+            console_log!("🚨 Coord mismatch: JS({}, {}) vs Rust({}, {})", current_x, current_y, final_coordinates.0, final_coordinates.1);
+        } else {
+            console_log!("✅ Coord sync");
+        }
+        
+        // Run the search using the engine's method with corrected coordinates
+        let move_sequence = self.engine.get_full_move_sequence_with_position(&board, current_piece, final_coordinates.0, final_coordinates.1, current_rotation as usize, next_piece, strategy);
+        console_log!("🎯 FINAL MOVE SEQUENCE: {}", move_sequence);
+
+        move_sequence
     }
 
     // Legacy methods for compatibility

@@ -176,6 +176,8 @@ export class Physics {
         }
         this.gameState.score += distance; // Award 1 point per cell dropped
         if (moved) {
+            this.gameState.lastAction = 'move';
+            this.gameState.lockResetsCount = 0;
             this.gameState.isPieceLanded = true;
             return { landed: true };
         }
@@ -190,6 +192,8 @@ export class Physics {
             distance++;
         }
         this.gameState.score += distance * 2; // Example score for hard drop
+        this.gameState.lastAction = 'hard_drop';
+        this.gameState.lockResetsCount = 0;
         
         const lockResult = this.lockTetromino();
         if (lockResult.gameOver) {
@@ -244,10 +248,8 @@ export class Physics {
     private checkForCompletedLinesWithDisplay(): { clearedLines: number, displayInfo?: { clearType: string, b2bCount: number, comboCount: number } } {
         // Check for spin BEFORE clearing lines (crucial for T-spin detection)
         const spinInfo = this.detectSpin();
-        let shouldCheckForSpin = false;
-        if (spinInfo.isSpin || this.gameState.lastAction === 'rotate') {
-            shouldCheckForSpin = true;
-        }
+        // Only consider spin if the last action was a rotation and piece did not move down after that rotation
+        const shouldCheckForSpin = spinInfo.isSpin && this.gameState.lastAction === 'rotate';
         
         let linesCleared = 0;
         let y = LOGICAL_BOARD_HEIGHT_BLOCKS - 1;
@@ -264,15 +266,9 @@ export class Physics {
         if (linesCleared > 0) {
             return this.updateScoringAndGetDisplayInfo(linesCleared, spinInfo, shouldCheckForSpin);
         } else {
-            // Check for any spin even with no lines cleared (only if we detected a spin before clearing)
-            if (shouldCheckForSpin && spinInfo.isSpin) {
-                // Any spin without clear gets scoring (but only T-spins show text)
-                return this.updateScoringAndGetDisplayInfo(0, spinInfo, shouldCheckForSpin);
-            } else {
-                // No lines cleared and no spin - break combo but keep B2B if it exists
-                this.gameState.comboCount = 0;
-                return { clearedLines: 0 };
-            }
+            // No clear; do not count spins without a line clear
+            this.gameState.comboCount = 0;
+            return { clearedLines: 0 };
         }
     }
 

@@ -72,15 +72,26 @@ impl Board {
                     return false; // This part of the piece is off the board
                 }
 
-                // Check for collisions with existing pieces
+                // Check horizontal bounds for each block in this row
+                for bit_pos in 0..16 {
+                    if (row_mask & (1 << bit_pos)) != 0 {
+                        // This position has a block - check if it's within board width
+                        if bit_pos < 0 || bit_pos >= BOARD_WIDTH as i32 {
+                            return false; // Block is outside board width (0-9)
+                        }
+                    }
+                }
+
+                // Check for collisions with existing pieces (only bits 0-9 matter for board state)
                 let board_row = self.rows[board_y as usize];
-                if board_row & (row_mask as u32) != 0 {
-                    return false; // Collision
+                let board_collision_mask = row_mask & ((1 << BOARD_WIDTH) - 1); // Mask to only consider bits 0-9
+                if board_row & (board_collision_mask as u32) != 0 {
+                    return false; // Collision with existing blocks
                 }
             }
             true // All parts of the piece are on the board and not colliding
         } else {
-            false // Piece is off the sides of the board
+            false // Piece mask not found (shouldn't happen with fixed mask generation)
         }
     }
 

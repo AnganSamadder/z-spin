@@ -13,6 +13,8 @@ export interface WasmTetrisEngine {
   spawn_tetromino(typeKey: number): boolean;
   get_game_state_json(): string;
   get_best_move(board: number[], current_piece: number, next_piece: number): string;
+  getBestMoveWithPosition(board: number[], current_piece: number, current_x: number, current_y: number, current_rotation: number, next_piece: number, strategy: number): string;
+  getFullMoveSequenceWithPosition(board: number[], current_piece: number, current_x: number, current_y: number, current_rotation: number, next_piece: number, strategy: number): string;
 }
 
 // Fallback implementation when WASM isn't available
@@ -99,6 +101,16 @@ class WasmTetrisEngineWrapper implements WasmTetrisEngine {
     }
     console.log('[WASM WRAPPER] Move queue empty.');
     return ''; // Return empty string for no-op
+  }
+
+  getBestMoveWithPosition(board: number[], current_piece: number, current_x: number, current_y: number, current_rotation: number, next_piece: number, strategy: number): string {
+    // Implementation needed
+    throw new Error("Method not implemented");
+  }
+
+  getFullMoveSequenceWithPosition(board: number[], current_piece: number, current_x: number, current_y: number, current_rotation: number, next_piece: number, strategy: number): string {
+    // Implementation needed
+    throw new Error("Method not implemented");
   }
 }
 

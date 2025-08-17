@@ -1,12 +1,12 @@
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
-use crate::board::BOARD_WIDTH;
+// use crate::board::BOARD_WIDTH; // unused
 
 // SRS Wall Kick Tables
 static KICK_DATA_JLSTZ: Lazy<HashMap<String, Vec<(i32, i32)>>> = Lazy::new(|| {
     let mut kicks = HashMap::new();
     
-    // Basic rotations (0->1, 1->2, 2->3, 3->0)
+    // Basic rotations (0->1, 1->2, 2->3, 3->0) - exactly matching TypeScript
     kicks.insert("0->1".to_string(), vec![(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)]);
     kicks.insert("1->0".to_string(), vec![(0, 0), (1, 0), (1, -1), (0, 2), (1, 2)]);
     kicks.insert("1->2".to_string(), vec![(0, 0), (1, 0), (1, -1), (0, 2), (1, 2)]);
@@ -16,7 +16,7 @@ static KICK_DATA_JLSTZ: Lazy<HashMap<String, Vec<(i32, i32)>>> = Lazy::new(|| {
     kicks.insert("3->0".to_string(), vec![(0, 0), (-1, 0), (-1, -1), (0, 2), (-1, 2)]);
     kicks.insert("0->3".to_string(), vec![(0, 0), (1, 0), (1, 1), (0, -2), (1, -2)]);
     
-    // 180 degree rotations
+    // 180 degree rotations - exactly matching TypeScript
     kicks.insert("0->2".to_string(), vec![(0, 0), (1, 0), (1, 1), (0, 1), (1, -1), (0, -1)]);
     kicks.insert("1->3".to_string(), vec![(0, 0), (0, 1), (-1, 1), (-1, 0), (-1, 2), (0, 2)]);
     kicks.insert("2->0".to_string(), vec![(0, 0), (-1, 0), (-1, -1), (0, -1), (-1, 1), (0, 1)]);
@@ -28,7 +28,7 @@ static KICK_DATA_JLSTZ: Lazy<HashMap<String, Vec<(i32, i32)>>> = Lazy::new(|| {
 static KICK_DATA_I: Lazy<HashMap<String, Vec<(i32, i32)>>> = Lazy::new(|| {
     let mut kicks = HashMap::new();
     
-    // Basic rotations
+    // Basic rotations - exactly matching TypeScript
     kicks.insert("0->1".to_string(), vec![(0, 0), (-2, 0), (1, 0), (-2, -1), (1, 2)]);
     kicks.insert("1->0".to_string(), vec![(0, 0), (2, 0), (-1, 0), (2, 1), (-1, -2)]);
     kicks.insert("1->2".to_string(), vec![(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)]);
@@ -38,7 +38,7 @@ static KICK_DATA_I: Lazy<HashMap<String, Vec<(i32, i32)>>> = Lazy::new(|| {
     kicks.insert("3->0".to_string(), vec![(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)]);
     kicks.insert("0->3".to_string(), vec![(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)]);
     
-    // 180 degree rotations
+    // 180 degree rotations - exactly matching TypeScript
     kicks.insert("0->2".to_string(), vec![(0, 0), (-1, 0), (2, 0), (-1, -1), (2, -1)]);
     kicks.insert("1->3".to_string(), vec![(0, 0), (0, 1), (0, -2), (2, 1), (-1, 1)]);
     kicks.insert("2->0".to_string(), vec![(0, 0), (1, 0), (-2, 0), (1, 1), (-2, 1)]);
@@ -136,7 +136,7 @@ impl Piece {
         };
         
         if let Some(kick_offsets) = kicks.get(&kick_key) {
-            for (kick_index, &(dx, dy)) in kick_offsets.iter().enumerate() {
+            for (_kick_index, &(dx, dy)) in kick_offsets.iter().enumerate() {
                 let test_piece = Self {
                     piece_type: self.piece_type,
                     x: self.x + dx,
@@ -145,11 +145,7 @@ impl Piece {
                 };
                 
                 if board.can_place_piece(&test_piece) {
-                    // Log when a kick is used for 180 rotations
-                    if kick_index > 0 {
-                        crate::console_log!("🔄 180° KICK APPLIED: {:?} {} -> {} at ({},{}) with kick #{} offset ({},{})", 
-                            self.piece_type, self.rotation, new_rotation, self.x, self.y, kick_index, dx, dy);
-                    }
+                    // Only log kicks in high-detail debug mode to avoid spam
                     return Some(test_piece);
                 }
             }
@@ -178,23 +174,59 @@ impl Piece {
         };
         
         if let Some(kick_offsets) = kicks.get(&kick_key) {
-            for (kick_index, &(dx, dy)) in kick_offsets.iter().enumerate() {
+            for (_kick_index, &(dx, dy)) in kick_offsets.iter().enumerate() {
                 let test_piece = Self {
                     piece_type: self.piece_type,
                     x: self.x + dx,
-                    y: self.y - dy, // SRS y-kicks are inverted for board coordinates
+                    y: self.y - dy,
                     rotation: new_rotation,
                 };
                 
                 if board.can_place_piece(&test_piece) {
-                    // Log when a kick is used (kick_index > 0 means we used a kick, not just basic rotation)
-                    if kick_index > 0 {
-                        crate::console_log!("🔄 KICK APPLIED: {:?} {} -> {} at ({},{}) with kick #{} offset ({},{})", 
-                            self.piece_type, self.rotation, new_rotation, self.x, self.y, kick_index, dx, dy);
-                    }
                     return Some(test_piece);
                 }
             }
+        } else {
+            // no kick data for this transition
+        }
+        
+        None
+    }
+
+    // Debug version that shows kick details - only for pathfinding simulation
+    pub fn try_rotate_clockwise_debug(&self, board: &crate::board::Board) -> Option<Self> {
+        if self.piece_type == PieceType::O {
+            return None;
+        }
+        
+        let new_rotation = (self.rotation + 1) % 4;
+        let kick_key = format!("{}->{}", self.rotation, new_rotation);
+        
+        let kicks = match self.piece_type {
+            PieceType::I => &KICK_DATA_I,
+            _ => &KICK_DATA_JLSTZ,
+        };
+        
+        if let Some(kick_offsets) = kicks.get(&kick_key) {
+            crate::console_log!("     🔄 Testing {} kicks for {}", kick_offsets.len(), kick_key);
+            
+            for (kick_index, &(dx, dy)) in kick_offsets.iter().enumerate() {
+                let test_piece = Self {
+                    piece_type: self.piece_type,
+                    x: self.x + dx,
+                    y: self.y - dy,
+                    rotation: new_rotation,
+                };
+                
+                if board.can_place_piece(&test_piece) {
+                    crate::console_log!("       ✅ SUCCESS: Kick {} offset ({},{}) → Final ({}, {})", 
+                                       kick_index, dx, dy, test_piece.x, test_piece.y);
+                    return Some(test_piece);
+                }
+            }
+            crate::console_log!("     ❌ All {} kicks failed for {}", kick_offsets.len(), kick_key);
+        } else {
+            crate::console_log!("     ❌ No kick data found for {}", kick_key);
         }
         
         None
@@ -206,49 +238,50 @@ type PieceMasks = HashMap<(PieceType, usize, i32), [u16; 4]>;
 
 static PIECE_MASKS: Lazy<PieceMasks> = Lazy::new(|| {
     let mut masks = HashMap::new();
+    let mut total_masks = 0;
     
     // Base shapes for each piece
     let base_shapes = [
-        // I piece
+        // I piece - 4x4 grid with pivot at (1, 1)
         vec![
             vec![(0, 1), (1, 1), (2, 1), (3, 1)], // Horizontal
             vec![(2, 0), (2, 1), (2, 2), (2, 3)], // Vertical
             vec![(0, 2), (1, 2), (2, 2), (3, 2)], // Horizontal
             vec![(1, 0), (1, 1), (1, 2), (1, 3)], // Vertical
         ],
-        // O piece (same for all rotations)
+        // O piece (same for all rotations) - 3x3 grid with pivot at (1, 1)
         vec![
             vec![(1, 1), (2, 1), (1, 2), (2, 2)]; 4
         ],
-        // T piece
+        // T piece - 3x3 grid with pivot at (1, 1) - FIXED TO MATCH TYPESCRIPT
         vec![
-            vec![(1, 0), (0, 1), (1, 1), (2, 1)], // Rotation 0 (Up)
-            vec![(1, 0), (1, 1), (1, 2), (2, 1)], // Rotation 1 (Right)
-            vec![(0, 1), (1, 1), (2, 1), (1, 2)], // Rotation 2 (Down)
-            vec![(1, 0), (0, 1), (1, 1), (1, 2)], // Rotation 3 (Left)
+            vec![(1, 0), (0, 1), (1, 1), (2, 1)], // Rotation 0: top center + bottom row
+            vec![(1, 0), (1, 1), (1, 2), (2, 1)], // Rotation 1: left column + right center
+            vec![(0, 1), (1, 1), (2, 1), (1, 2)], // Rotation 2: top row + bottom center
+            vec![(1, 0), (0, 1), (1, 1), (1, 2)], // Rotation 3: right column + left center
         ],
-        // S piece
+        // S piece - 3x3 grid with pivot at (1, 1)
         vec![
             vec![(1, 0), (2, 0), (0, 1), (1, 1)],
             vec![(1, 0), (1, 1), (2, 1), (2, 2)],
             vec![(1, 1), (2, 1), (0, 2), (1, 2)],
             vec![(0, 0), (0, 1), (1, 1), (1, 2)],
         ],
-        // Z piece
+        // Z piece - 3x3 grid with pivot at (1, 1)
         vec![
             vec![(0, 0), (1, 0), (1, 1), (2, 1)],
             vec![(2, 0), (1, 1), (2, 1), (1, 2)],
             vec![(0, 1), (1, 1), (1, 2), (2, 2)],
             vec![(1, 0), (0, 1), (1, 1), (0, 2)],
         ],
-        // J piece
+        // J piece - 3x3 grid with pivot at (1, 1)
         vec![
             vec![(0, 0), (0, 1), (1, 1), (2, 1)],
             vec![(1, 0), (2, 0), (1, 1), (1, 2)],
             vec![(0, 1), (1, 1), (2, 1), (2, 2)],
             vec![(1, 0), (1, 1), (1, 2), (0, 2)],
         ],
-        // L piece
+        // L piece - 3x3 grid with pivot at (1, 1)
         vec![
             vec![(2, 0), (0, 1), (1, 1), (2, 1)],
             vec![(1, 0), (1, 1), (1, 2), (2, 2)],
@@ -269,31 +302,70 @@ static PIECE_MASKS: Lazy<PieceMasks> = Lazy::new(|| {
             _ => continue,
         };
 
-        for (rotation, blocks) in piece_rotations.iter().enumerate() {
-            // Generate masks for all possible x positions
-            for x_offset in -3..=10 {
-                let mut mask = [0u16; 4];
-                let mut is_valid = true;
+        // Generate masks per piece type
 
-                // Check if all blocks are within bounds before creating mask
-                for &(bx, _by) in blocks {
-                    let board_x = x_offset + bx as i32;
-                    if board_x < 0 || board_x >= BOARD_WIDTH as i32 {
-                        is_valid = false;
+        for (rotation, blocks) in piece_rotations.iter().enumerate() {
+            // Generate masks for all possible x positions - EXTENDED RANGE for pieces near board edges
+            for x_offset in -10..=20 { // Massively extended range to definitely cover x=8+ positions
+                let mut mask = [0u16; 4];
+                let mut has_valid_blocks = false;
+
+                // CRITICAL FIX: Convert from grid coordinates to relative coordinates from anchor
+                // This matches the TypeScript calculation: boardX = pivotBoardX + (c_shape - pivot.c)
+                let pivot_col = match piece_type {
+                    PieceType::I => 1, // I piece uses (1,1) pivot in 4x4 grid, but we treat it as (1,1) 
+                    _ => 1, // All other pieces use (1,1) pivot in 3x3 grid
+                };
+                let pivot_row = 1; // All pieces use row 1 as pivot
+
+                // VALIDATE ALL BLOCKS ARE WITHIN BOARD BOUNDS BEFORE CREATING MASK
+                let mut all_blocks_valid = true;
+                for &(grid_col, grid_row) in blocks {
+                    let rel_x = grid_col as i32 - pivot_col;
+                    let board_x = x_offset + rel_x;
+                    
+                    // If ANY block would be outside board bounds (0-9), skip this position entirely
+                    if board_x < 0 || board_x >= 10 {
+                        all_blocks_valid = false;
                         break;
                     }
                 }
+                
+                // Only generate mask if ALL blocks are within board bounds
+                if !all_blocks_valid {
+                    continue;
+                }
 
-                if is_valid {
-                    for &(bx, by) in blocks {
-                        let board_x = x_offset + bx as i32;
-                        mask[by] |= 1 << board_x;
+                for &(grid_col, grid_row) in blocks {
+                    // Convert grid coordinates to relative coordinates from piece anchor
+                    let rel_x = grid_col as i32 - pivot_col;
+                    let rel_y = grid_row as i32 - pivot_row;
+                    
+                    // Calculate absolute board position for this x_offset
+                    let board_x = x_offset + rel_x;
+                    
+                    // Store relative coordinates in mask - handle negative y-offsets properly
+                    // Mask array: [y-1, y+0, y+1, y+2] relative to anchor
+                    let mask_y_index = rel_y + 1; // Convert relative y (-1,0,1,2) to array index (0,1,2,3)
+                    
+                    // Only add blocks that are within the 16-bit mask range and valid mask array bounds
+                    if board_x >= 0 && board_x < 16 && mask_y_index >= 0 && mask_y_index < 4 {
+                        mask[mask_y_index as usize] |= 1 << board_x;
+                        has_valid_blocks = true;
                     }
+                }
+
+                // Create mask if it has any valid blocks
+                if has_valid_blocks {
                     masks.insert((piece_type, rotation, x_offset), mask);
+                    total_masks += 1;
                 }
             }
         }
     }
+    
+    crate::console_log!("🧩 PIECE_MASKS: generated {} masks", total_masks);
+    
     masks
 });
 
