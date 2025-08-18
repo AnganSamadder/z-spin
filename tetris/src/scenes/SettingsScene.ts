@@ -49,7 +49,7 @@ export class SettingsScene extends Phaser.Scene {
             .setOrigin(0.5)
             .setInteractive({ useHandCursor: true })
             .on('pointerdown', () => this.switchTab('AudioVisual'));
-        
+
         this.updateTabHighlights(gameplayTabButton, controlsTabButton, audioVisualTabButton);
 
         currentY += settingSpacing; // Space after tabs
@@ -60,8 +60,8 @@ export class SettingsScene extends Phaser.Scene {
         // --- Gameplay Settings ---
         let gameplayY = currentY;
         const ghostPieceToggle = this.createToggle(
-            centerX - labelXOffset + 150, 
-            gameplayY, 
+            centerX - labelXOffset + 150,
+            gameplayY,
             'Ghost Piece:',
             this.currentSettings.ghostPieceEnabled,
             (newValue) => { this.currentSettings.ghostPieceEnabled = newValue; this.saveSettings(); }
@@ -79,7 +79,7 @@ export class SettingsScene extends Phaser.Scene {
 
         const arrSlider = this.createSlider(
             centerX - labelXOffset, gameplayY, 'ARR (ms):',
-            'arr', 0, 200, 1, 
+            'arr', 0, 200, 1,
             false
         );
         this.settingsObjects.push(...arrSlider);
@@ -87,15 +87,15 @@ export class SettingsScene extends Phaser.Scene {
 
         const dasSlider = this.createSlider(
             centerX - labelXOffset, gameplayY, 'DAS (ms):',
-            'das', 0, 300, 1, 
+            'das', 0, 300, 1,
             false
         );
         this.settingsObjects.push(...dasSlider);
         gameplayY += settingSpacing;
-        
+
         const dcdSlider = this.createSlider(
             centerX - labelXOffset, gameplayY, 'DCD (ms):',
-            'dcd', 0, 100, 1, 
+            'dcd', 0, 100, 1,
             false
         );
         this.settingsObjects.push(...dcdSlider);
@@ -103,15 +103,15 @@ export class SettingsScene extends Phaser.Scene {
 
         const sdfSlider = this.createSlider(
             centerX - labelXOffset, gameplayY, 'SDF (xGrav):',
-            'sdf', 1, 50, 1, 
-            true, 50 
+            'sdf', 1, 50, 1,
+            true, 50
         );
         this.settingsObjects.push(...sdfSlider);
         gameplayY += settingSpacing;
-        
+
         const nextQueueSlider = this.createSlider(
             centerX - labelXOffset, gameplayY, 'Next Pieces:',
-            'nextQueueSize', 0, 6, 1, 
+            'nextQueueSize', 0, 6, 1,
             false
         );
         this.settingsObjects.push(...nextQueueSlider);
@@ -151,22 +151,22 @@ export class SettingsScene extends Phaser.Scene {
             holdPiece: 'Hold Piece:',
             resetGame: 'Reset Game:'
         };
-        
+
         const keybindActions: (keyof GameSettings['keybinds'] )[] = [
             'moveLeft', 'moveRight',
             'rotateCW', 'rotateCCW', 'rotate180', // rotate180 moved here
             'softDrop', 'hardDrop', 'holdPiece', 'resetGame'
         ];
-        
+
         const keybindLabelX = centerX - 225; // Adjusted from -270 to center the interactive keybind elements
         const initialControlsYSpacing = 30; // Controls settings closer together (reduced from 30)
 
         for (const action of keybindActions) {
             const keybindEditors = this.createKeybindEditor(keybindLabelX, controlsY, actionDisplayNames[action], action);
             this.settingsObjects.push(...keybindEditors);
-            controlsY += initialControlsYSpacing; 
+            controlsY += initialControlsYSpacing;
         }
-        // controlsY += keybindSpacing; 
+        // controlsY += keybindSpacing;
 
         // --- Back Button (position dynamically based on content height or fixed at bottom) ---
         // For simplicity, let's keep it at a fixed position near the bottom.
@@ -187,8 +187,8 @@ export class SettingsScene extends Phaser.Scene {
     }
 
     private updateTabHighlights(
-        gameplayTabButton: Phaser.GameObjects.Text, 
-        controlsTabButton: Phaser.GameObjects.Text, 
+        gameplayTabButton: Phaser.GameObjects.Text,
+        controlsTabButton: Phaser.GameObjects.Text,
         audioVisualTabButton: Phaser.GameObjects.Text
     ): void {
         gameplayTabButton.setBackgroundColor(this.activeTab === 'Gameplay' ? '#555555' : '#333333');
@@ -254,7 +254,7 @@ export class SettingsScene extends Phaser.Scene {
 
                 if (primaryElement.name.endsWith('_label') || primaryElement.name.endsWith('_display1')) {
                     const groupName = primaryElement.name.substring(0, primaryElement.name.lastIndexOf('_'));
-                    
+
                     this.settingsObjects.filter(gObj => gObj.name.startsWith(groupName)).forEach(part => {
                         // Ensure part is treated as a type that has setVisible and setActive
                         const interactivePart = part as Phaser.GameObjects.Text | Phaser.GameObjects.Graphics | Phaser.GameObjects.Zone;
@@ -314,7 +314,7 @@ export class SettingsScene extends Phaser.Scene {
         };
 
         if (tabName === 'Gameplay') {
-            const gameplayObjects = this.settingsObjects.filter(obj => 
+            const gameplayObjects = this.settingsObjects.filter(obj =>
                 obj.name.startsWith('toggle_ghostpiece') || // Corrected name
                 obj.name.startsWith('slider_gravityValue') ||
                 obj.name.startsWith('slider_arr') ||
@@ -325,7 +325,7 @@ export class SettingsScene extends Phaser.Scene {
             );
             repositionObjects(gameplayObjects);
         } else if (tabName === 'Controls') {
-            const controlsObjects = this.settingsObjects.filter(obj => 
+            const controlsObjects = this.settingsObjects.filter(obj =>
                 obj.name.startsWith('keybind_')
             );
             repositionObjects(controlsObjects, true);
@@ -346,11 +346,11 @@ export class SettingsScene extends Phaser.Scene {
         const toggleButton = this.add.text(x + 10, y, toggleText, { font: '22px Arial', color: color, backgroundColor: '#333333', padding: { left:10, right:10, top:3, bottom:3 } })
             .setOrigin(0, 0.5)
             .setInteractive({ useHandCursor: true });
-        
+
         const namePrefix = 'toggle_' + label.toLowerCase().replace(/\s+/g, '').replace(':', ''); // e.g., toggle_ghostpiece
         labelObj.setName(namePrefix + '_label');
         toggleButton.setName(namePrefix + '_button');
-        
+
         // Set initial positions (will be updated by switchTab)
         labelObj.x = x - 10; labelObj.y = y;
         toggleButton.x = x + 10; toggleButton.y = y;
@@ -362,7 +362,7 @@ export class SettingsScene extends Phaser.Scene {
                 currentActualValue = this.currentSettings.ghostPieceEnabled;
             }
             // Add more direct property checks if new toggles are added.
-            
+
             if (typeof currentActualValue === 'boolean') {
                 const newToggleState = !currentActualValue;
                 callback(newToggleState); // This will update this.currentSettings via the callback
@@ -408,13 +408,13 @@ export class SettingsScene extends Phaser.Scene {
         thumb.fillStyle(0xeeeeee);
         thumb.fillRect(0, 0, thumbWidth, thumbHeight); // Draw thumb at its local 0,0
         const thumbInteractive = this.add.zone(0, 0, thumbWidth, thumbHeight)
-            .setOrigin(0, 0.5) 
+            .setOrigin(0, 0.5)
             .setInteractive({ draggable: true });
-        
+
         // Ensure thumb and its interactive zone are on top for input and visuals
         thumb.setDepth(1);
         thumbInteractive.setDepth(1);
-        
+
         const valueDisplay = this.add.text(x + 180 + valueTextXOffset, y, '', { font: '20px Arial', color: '#ffff00' }).setOrigin(0, 0.5);
 
         const namePrefix = 'slider_' + String(settingKey);
@@ -431,7 +431,7 @@ export class SettingsScene extends Phaser.Scene {
         // Thumb and thumbInteractive are positioned by updateThumbAndValue initially, then by dragging/switchTab.
         // updateThumbAndValue takes care of thumb.x based on value. switchTab will handle thumb.y.
         valueDisplay.x = x + 180 + valueTextXOffset; valueDisplay.y = y;
-        
+
         const trackZoneOriginalX = x + 180; // Store original relative X for trackZone
         const trackZoneOriginalY = y - sliderHeight / 2; // Store original relative Y for trackZone
 
@@ -452,9 +452,9 @@ export class SettingsScene extends Phaser.Scene {
                     displayValText = newValue.toString();
                 }
             }
-            
+
             valueDisplay.setText(displayValText);
-            
+
             if (!fromDrag) { // Only update thumb position if not called from thumb drag itself
                 let percent = 0;
                 let valueForPercentCalculation = newValue;
@@ -474,16 +474,16 @@ export class SettingsScene extends Phaser.Scene {
                 thumb.x = clampedThumbX;
                 // thumb.y will be set by switchTab or drag relative to the currentY of the slider group
                 // thumb.y = y - thumbHeight / 2; // This y is the original y, not currentY from switchTab
-                thumbInteractive.x = clampedThumbX; 
-                // thumbInteractive.y = y; 
+                thumbInteractive.x = clampedThumbX;
+                // thumbInteractive.y = y;
             }
-            
+
             // Update the actual setting in currentSettings
             (this.currentSettings[settingKey] as any) = actualSettingValue;
             console.log(`[SettingsScene_Slider] Updated currentSettings.${String(settingKey)} = ${this.currentSettings[settingKey]}. Display: ${displayValText}`); // ADDED LOG
             if(!fromDrag) this.saveSettings(); // Save settings, unless it's a continuous drag
         };
-        
+
         // Initialize thumb and value
         let initialSliderDisplayValue = initialValue;
          if (settingKey === 'masterVolume' || settingKey === 'sfxVolume' || settingKey === 'musicVolume') {
@@ -495,14 +495,14 @@ export class SettingsScene extends Phaser.Scene {
 
 
         thumbInteractive.on('drag', (pointer: Phaser.Input.Pointer, dragX: number, dragY: number) => {
-            let newThumbX = dragX; 
+            let newThumbX = dragX;
             const trackStartX = labelObj.x + 180; // Use label's current x + offset
             const trackEndX = trackStartX + sliderWidth - thumbWidth;
 
             newThumbX = Phaser.Math.Clamp(newThumbX, trackStartX, trackEndX);
             thumb.x = newThumbX;
             thumbInteractive.x = newThumbX; // Keep the interactive zone aligned with the visual thumb after clamping
-            
+
             let percent = 0;
             if (sliderWidth - thumbWidth > 0) { // Avoid division by zero if slider is too small
                 percent = (newThumbX - trackStartX) / (sliderWidth - thumbWidth);
@@ -510,7 +510,7 @@ export class SettingsScene extends Phaser.Scene {
             percent = Phaser.Math.Clamp(percent, 0, 1);
 
             let newValue = minValue + (maxValue - minValue) * percent;
-            
+
             // Snap to step
             newValue = Math.round(newValue / step) * step;
             newValue = Phaser.Math.Clamp(newValue, minValue, maxValue);
@@ -532,14 +532,14 @@ export class SettingsScene extends Phaser.Scene {
         trackZone.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
             const trackStartX = labelObj.x + 180; // Use label's current x + offset
             const clickX = pointer.x;
-            
+
             let percent = (clickX - trackStartX) / sliderWidth;
             percent = Phaser.Math.Clamp(percent, 0, 1);
 
             let newValue = minValue + (maxValue - minValue) * percent;
             newValue = Math.round(newValue / step) * step;
             newValue = Phaser.Math.Clamp(newValue, minValue, maxValue);
-            
+
             // Update thumb position based on this new value
             const newThumbX = trackStartX + (sliderWidth - thumbWidth) * ((newValue - minValue) / (maxValue - minValue));
             thumb.x = Phaser.Math.Clamp(newThumbX, trackStartX, trackStartX + sliderWidth - thumbWidth);
@@ -597,7 +597,7 @@ export class SettingsScene extends Phaser.Scene {
 
     private captureKeyForAction(actionKey: keyof GameSettings['keybinds'], keyIndex: number, activeDisplay: Phaser.GameObjects.Text, otherDisplay: Phaser.GameObjects.Text): void {
         activeDisplay.setText('Press key...').setColor('#ff9900');
-        
+
         if (this.input.keyboard) { // Check if keyboard manager is available
         this.input.keyboard.once('keydown', (event: KeyboardEvent) => {
                 event.preventDefault(); // Prevent default browser action for this key press
@@ -639,7 +639,7 @@ export class SettingsScene extends Phaser.Scene {
                         }
                     }
             }
-            
+
                 this.currentSettings.keybinds[actionKey][keyIndex] = newKeyString;
 
                 activeDisplay.setText(newKeyString).setColor('#FFFF00');
@@ -653,4 +653,4 @@ export class SettingsScene extends Phaser.Scene {
             activeDisplay.setText(keyValue).setColor('#FFFF00');
         }
     }
-} 
+}

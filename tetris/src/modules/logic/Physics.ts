@@ -46,7 +46,7 @@ export class Physics {
 
         const tetrominoData = TETROMINOES[typeKey];
         const currentRotationState = this.gameState.currentTetromino.rotation;
-        
+
         let rotationAmount: number;
         switch (direction) {
             case 'clockwise':
@@ -84,16 +84,16 @@ export class Physics {
 
     private handlePostSuccessfulMoveRotation(): boolean {
         const landedAfterMove = this.checkCollision(this.gameState.currentTetromino!.x, this.gameState.currentTetromino!.y + 1, this.gameState.currentTetromino!.shape);
-        
+
         // Reset lock resets only if the piece moves away from the ground
         if (!landedAfterMove && this.gameState.isPieceLanded) {
             this.gameState.lockResetsCount = 0;
         }
-        
+
         this.gameState.isPieceLanded = landedAfterMove;
         return landedAfterMove;
     }
-    
+
     public moveBlockDown(isSoftDrop: boolean): { landed: boolean, gameOver: boolean } {
         if (!this.gameState.currentTetromino) return { landed: false, gameOver: false };
 
@@ -194,7 +194,7 @@ export class Physics {
         this.gameState.score += distance * 2; // Example score for hard drop
         this.gameState.lastAction = 'hard_drop';
         this.gameState.lockResetsCount = 0;
-        
+
         const lockResult = this.lockTetromino();
         if (lockResult.gameOver) {
             return { clearedLines: 0, gameOver: true };
@@ -208,7 +208,7 @@ export class Physics {
 
         const { shape, x: pivotBoardX, y: pivotBoardY, color, typeKey } = this.gameState.currentTetromino;
         const pivot = TETROMINOES[typeKey as keyof typeof TETROMINOES].pivot;
-        
+
         let isGameOver = false;
 
         for (let r_shape = 0; r_shape < shape.length; r_shape++) {
@@ -227,7 +227,7 @@ export class Physics {
                 }
             }
         }
-        
+
         if (isGameOver) {
             this.gameState.gameOver = true;
             return { clearedLines: 0, gameOver: true };
@@ -236,7 +236,7 @@ export class Physics {
         const { clearedLines, displayInfo } = this.checkForCompletedLinesWithDisplay();
         this.gameState.currentTetromino = null;
         this.gameState.canHold = true;
-        
+
         return { clearedLines, gameOver: this.gameState.gameOver, displayInfo };
     }
 
@@ -250,7 +250,7 @@ export class Physics {
         const spinInfo = this.detectSpin();
         // Only consider spin if the last action was a rotation and piece did not move down after that rotation
         const shouldCheckForSpin = spinInfo.isSpin && this.gameState.lastAction === 'rotate';
-        
+
         let linesCleared = 0;
         let y = LOGICAL_BOARD_HEIGHT_BLOCKS - 1;
         while (y >= 0) {
@@ -275,13 +275,13 @@ export class Physics {
     private updateScoringAndGetDisplayInfo(linesCleared: number, spinInfo?: { isSpin: boolean, pieceType: string }, shouldCheckForSpin?: boolean): { clearedLines: number, displayInfo: { clearType: string, b2bCount: number, comboCount: number } } {
         // Check if it's a perfect clear (board is completely empty after line clear)
         const isPerfectClear = this.isEmptyBoard();
-        
+
         // Determine line clear type and if it's "difficult" (maintains B2B)
         const { clearType, isDifficultClear, baseScore } = this.getClearTypeAndScore(linesCleared, isPerfectClear, spinInfo, shouldCheckForSpin);
-        
+
         // Update combo count
         this.gameState.comboCount++;
-        
+
         // Update B2B state
         if (isDifficultClear) {
             if (this.gameState.backToBackActive) {
@@ -295,28 +295,28 @@ export class Physics {
             this.gameState.backToBackActive = false;
             this.gameState.backToBackCount = 0;
         }
-        
+
         // Calculate final score with bonuses
         let finalScore = baseScore;
-        
+
         // Apply B2B bonus (1.5x multiplier)
         if (this.gameState.backToBackActive && isDifficultClear && this.gameState.backToBackCount >= 2) {
             finalScore = Math.floor(finalScore * 1.5);
         }
-        
+
         // Apply combo bonus (50 points per combo level)
         if (this.gameState.comboCount > 1) {
             finalScore += (this.gameState.comboCount - 1) * 50;
         }
-        
+
         // Apply perfect clear bonus (massive bonus)
         if (isPerfectClear) {
             finalScore += 3500; // Flat bonus for perfect clear
         }
-        
+
         // Add to total score
         this.gameState.score += finalScore;
-        
+
         // Return display info instead of directly showing it
         const displayClearType = isPerfectClear ? 'PERFECT CLEAR!' : clearType;
         return {
@@ -344,13 +344,13 @@ export class Physics {
         let clearType = '';
         let isDifficultClear = false;
         let baseScore = 0;
-        
+
         if (spinInfo && spinInfo.isSpin) {
             // All spins are difficult and maintain B2B
             isDifficultClear = true;
-            
+
             const spinPrefix = `${spinInfo.pieceType}-SPIN`;
-            
+
             if (linesCleared === 0) {
                 clearType = spinPrefix;
                 baseScore = 100; // Spin without clear
@@ -408,7 +408,7 @@ export class Physics {
                     break;
             }
         }
-        
+
         return { clearType, isDifficultClear, baseScore };
     }
 
@@ -417,19 +417,19 @@ export class Physics {
         if (!this.gameState.currentTetromino) {
             return { isSpin: false, pieceType: '' };
         }
-        
+
         // Only check for spin if the last action was a rotation
         if (this.gameState.lastAction !== 'rotate') {
             return { isSpin: false, pieceType: '' };
         }
-        
+
         const pieceType = this.gameState.currentTetromino.typeKey;
-        
+
         // Only check for spins on pieces that can spin (not O-piece)
         if (pieceType === 'O') {
             return { isSpin: false, pieceType: '' };
         }
-        
+
         const isSpin = this.checkSpinCondition(this.gameState.currentTetromino);
         return { isSpin, pieceType };
     }
@@ -449,7 +449,7 @@ export class Physics {
         for (const corner of corners) {
             const isOutOfBounds = corner.x < 0 || corner.x >= 10 || corner.y < 0 || corner.y >= LOGICAL_BOARD_HEIGHT_BLOCKS;
             const hasBlock = !isOutOfBounds && corner.y < this.gameState.board.length && this.gameState.board[corner.y][corner.x] !== null;
-            
+
             if (isOutOfBounds || hasBlock) {
                 filledCorners++;
             }
@@ -505,7 +505,7 @@ export class Physics {
 
         this.gameState.isPieceLanded = false;
         this.gameState.lockResetsCount = 0;
-        
+
         const landed = this.checkCollision(this.gameState.currentTetromino.x, this.gameState.currentTetromino.y + 1, this.gameState.currentTetromino.shape)
         this.gameState.isPieceLanded = landed;
 
@@ -518,13 +518,13 @@ export class Physics {
         }
 
         const currentTypeKey = this.gameState.currentTetromino?.typeKey;
-        
+
         const heldState = this.gameState.heldTetromino;
 
         this.gameState.heldTetromino = currentTypeKey ? { typeKey: currentTypeKey } : null;
         this.gameState.canHold = false;
         this.gameState.currentTetromino = null;
-        
+
         if (heldState) {
             // Spawn from hold
             return this.spawnHeld(heldState.typeKey);
@@ -556,4 +556,4 @@ export class Physics {
         this.gameState.isPieceLanded = landed;
         return { success: true, gameOver: false, landed: landed };
     }
-} 
+}

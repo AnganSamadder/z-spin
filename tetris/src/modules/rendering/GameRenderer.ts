@@ -36,7 +36,7 @@ export class GameRenderer {
     constructor(scene: GameScene) {
         this.scene = scene;
         this.gameState = scene.gameState;
-        
+
         this.graphics = this.scene.add.graphics();
         this.scene.cameras.main.roundPixels = true;
 
@@ -75,15 +75,9 @@ export class GameRenderer {
 
     public showComboText(clearType: string, b2bCount: number, comboCount: number): void {
         if (clearType) {
-            // Format T-spin text with line breaks
-            let displayText = clearType;
-            if (clearType.includes('T-SPIN')) {
-                // Replace "T-SPIN SINGLE/DOUBLE/TRIPLE" with "T-SPIN\nSINGLE/DOUBLE/TRIPLE"
-                displayText = clearType.replace('T-SPIN SINGLE', 'T-SPIN\nSINGLE');
-                displayText = displayText.replace('T-SPIN DOUBLE', 'T-SPIN\nDOUBLE');
-                displayText = displayText.replace('T-SPIN TRIPLE', 'T-SPIN\nTRIPLE');
-                // Keep "T-SPIN" (no clear) as is
-            }
+            // Intelligent text wrapping based on available space
+            let displayText = this.wrapTextIntelligently(clearType, HOLD_AREA_WIDTH - 20); // 20px padding
+
             this.comboText.setText(displayText).setVisible(true);
         } else {
             this.comboText.setVisible(false);
@@ -102,6 +96,95 @@ export class GameRenderer {
         }
     }
 
+    private wrapTextIntelligently(text: string, maxWidth: number, style?: any): string {
+        // Special handling for known text patterns
+        if (text === 'PERFECT CLEAR!') {
+            return 'PERFECT\nCLEAR!';
+        }
+
+        if (text.includes('-SPIN')) {
+            // Handle all spin text with intelligent breaks
+            if (text.includes(' SINGLE')) {
+                return text.replace(' SINGLE', '\nSINGLE');
+            }
+            if (text.includes(' DOUBLE')) {
+                return text.replace(' DOUBLE', '\nDOUBLE');
+            }
+            if (text.includes(' TRIPLE')) {
+                return text.replace(' TRIPLE', '\nTRIPLE');
+            }
+            if (text.includes(' TETRIS')) {
+                return text.replace(' TETRIS', '\nTETRIS');
+            }
+            if (text.includes(' LINES')) {
+                return text.replace(' LINES', '\nLINES');
+            }
+            // For spin without clear (e.g., "T-SPIN", "I-SPIN"), keep as is
+            return text;
+        }
+
+        if (text === 'TETRIS') {
+            return text; // TETRIS is short enough
+        }
+
+        // For other text, use general wrapping logic
+        return this.generalTextWrap(text, maxWidth, style);
+    }
+
+    private generalTextWrap(text: string, maxWidth: number, style?: any): string {
+        // Use provided style or default to comboText style
+        const textStyle = style || this.comboText.style;
+
+        // Create a temporary text object to measure text width
+        const tempText = this.scene.add.text(0, 0, text, textStyle);
+        const textWidth = tempText.width;
+        tempText.destroy();
+
+        // If text fits within maxWidth, return as is
+        if (textWidth <= maxWidth) {
+            return text;
+        }
+
+        // For text that's too wide, try to break at natural points
+        const words = text.split(' ');
+        if (words.length > 1) {
+            // Try breaking at word boundaries
+            for (let i = 1; i < words.length; i++) {
+                const firstLine = words.slice(0, i).join(' ');
+                const secondLine = words.slice(i).join(' ');
+
+                const tempText1 = this.scene.add.text(0, 0, firstLine, textStyle);
+                const tempText2 = this.scene.add.text(0, 0, secondLine, textStyle);
+                const width1 = tempText1.width;
+                const width2 = tempText2.width;
+                tempText1.destroy();
+                tempText2.destroy();
+
+                if (width1 <= maxWidth && width2 <= maxWidth) {
+                    return `${firstLine}\n${secondLine}`;
+                }
+            }
+        }
+
+        // If word breaking doesn't work, try character-based breaking
+        const fontSize = textStyle.fontSize || parseInt(textStyle.font) || 30;
+        const charsPerLine = Math.floor(maxWidth / fontSize * 1.5);
+        if (text.length > charsPerLine) {
+            const midPoint = Math.floor(text.length / 2);
+            // Try to break at a space near the middle
+            const spaceIndex = text.lastIndexOf(' ', midPoint);
+            if (spaceIndex > 0) {
+                return `${text.substring(0, spaceIndex)}\n${text.substring(spaceIndex + 1)}`;
+            } else {
+                // Break at character boundary
+                return `${text.substring(0, midPoint)}\n${text.substring(midPoint)}`;
+            }
+        }
+
+        // If all else fails, return the original text
+        return text;
+    }
+
     public hideComboTexts(): void {
         this.comboText.setVisible(false);
         this.backToBackText.setVisible(false);
@@ -118,8 +201,16 @@ export class GameRenderer {
         this.gameOverOverlay.fillStyle(0x000000, 0.7);
         this.gameOverOverlay.fillRect(0, 0, gameWidth, gameHeight);
 
-        this.gameOverText = this.scene.add.text(this.scene.cameras.main.centerX, this.scene.cameras.main.centerY, 'GAME OVER\nFinal Score: ' + this.gameState.score,
-            { font: '48px Arial', color: '#ffffff', align: 'center' }).setOrigin(0.5);
+        const gameOverStyle = { font: '48px Arial', color: '#ffffff', align: 'center' };
+        const gameOverMessage = `GAME OVER\nFinal Score: ${this.gameState.score}`;
+        const wrappedMessage = this.wrapTextIntelligently(gameOverMessage, gameWidth * 0.8, gameOverStyle); // Use 80% of screen width
+
+        this.gameOverText = this.scene.add.text(
+            this.scene.cameras.main.centerX,
+            this.scene.cameras.main.centerY,
+            wrappedMessage,
+            gameOverStyle
+        ).setOrigin(0.5);
     }
 
     // Alias for drawGameOver to maintain compatibility with WasmEngine
@@ -131,7 +222,7 @@ export class GameRenderer {
         if (this.gameOverText) { this.gameOverText.destroy(); this.gameOverText = null; }
         if (this.gameOverOverlay) { this.gameOverOverlay.destroy(); this.gameOverOverlay = null; }
     }
-    
+
     public drawGame(): void {
         this.graphics.clear();
 
@@ -167,9 +258,9 @@ export class GameRenderer {
             if (this.gameState.currentTetromino) {
                 const { typeKey } = this.gameState.currentTetromino;
                 const color = TETROMINOES[typeKey as keyof typeof TETROMINOES]?.color || 0xFFFFFF;
-                
+
                 this.graphics.fillStyle(color, 1);
-                
+
                 // Draw each block separately based on the coordinates from WASM
                 for (const block of this.gameState.currentTetrominoBlocks) {
                     if (block.y >= BUFFER_ZONE_HEIGHT) {
@@ -181,7 +272,7 @@ export class GameRenderer {
                     }
                 }
             }
-        } 
+        }
         // Standard JS rendering
         else if (this.gameState.currentTetromino) {
             // Regular ghost piece
@@ -248,7 +339,7 @@ export class GameRenderer {
         const shape = tetrominoData.shapes[0]; // Use the default rotation for preview
 
         this.graphics.fillStyle(color, 1);
-        
+
         let min_r = shape.length, max_r = -1, min_c = shape[0].length, max_c = -1;
         let hasBlocks = false;
         for (let r = 0; r < shape.length; r++) {
@@ -262,7 +353,7 @@ export class GameRenderer {
         }
 
         if(!hasBlocks) return;
-        
+
         const pieceWidth = (max_c - min_c + 1) * BLOCK_SIZE;
         const pieceHeight = (max_r - min_r + 1) * BLOCK_SIZE;
         const offsetX = (areaWidth - pieceWidth) / 2;
@@ -280,4 +371,4 @@ export class GameRenderer {
             }
         }
     }
-} 
+}

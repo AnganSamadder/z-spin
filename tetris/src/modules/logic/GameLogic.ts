@@ -55,21 +55,21 @@ export class GameLogic {
         } else {
             this.scene.cancelLockDelayTimer();
         }
-        
+
         this.renderer.drawGame();
     }
 
     public moveBlockDown(isSoftDrop: boolean = false): void {
         if (!this.gameState.canManipulatePiece || !this.gameState.currentTetromino) return;
-        
+
         const wasLanded = this.gameState.isPieceLanded;
         const result = this.physics.moveBlockDown(isSoftDrop);
-        
+
         // Update score display if soft drop awarded points
         if (isSoftDrop) {
             this.renderer.updateScore(this.gameState.score);
         }
-        
+
         // Only start lock delay timer if piece just landed (transition from falling to landed)
         if (result.landed && !wasLanded) {
             this.scene.startLockDelayTimer();
@@ -77,7 +77,7 @@ export class GameLogic {
             // Piece was landed but moved down, cancel lock delay
             this.scene.cancelLockDelayTimer();
         }
-        
+
         this.renderer.drawGame();
     }
 
@@ -122,7 +122,7 @@ export class GameLogic {
 
     public lockTetromino(): { clearedLines: number, gameOver: boolean, displayInfo?: { clearType: string, b2bCount: number, comboCount: number } } {
         const result = this.physics.lockTetromino();
-        
+
         if (result.gameOver) {
             this.gameState.gameOver = true;
         }
@@ -140,7 +140,7 @@ export class GameLogic {
         this.renderer.drawGame();
         this.renderer.drawGameOver();
     }
-    
+
     public performHold(): void {
         if (!this.gameState.canManipulatePiece) return;
         const result = this.physics.performHold();
@@ -149,10 +149,10 @@ export class GameLogic {
                 this.handleGeneralGameOver();
                 return;
             }
-            
+
             // Reset manipulation flag to allow player control of new piece
             this.gameState.canManipulatePiece = true;
-            
+
             if (result.landed) {
                 this.scene.startLockDelayTimer();
             } else {
@@ -162,22 +162,24 @@ export class GameLogic {
         }
     }
 
-    public performHardDrop(): void {
-        if (!this.gameState.canManipulatePiece || !this.gameState.currentTetromino) return;
+    public performHardDrop(): { clearedLines: number, gameOver: boolean, displayInfo?: { clearType: string, b2bCount: number, comboCount: number } } {
+        if (!this.gameState.canManipulatePiece || !this.gameState.currentTetromino) {
+            return { clearedLines: 0, gameOver: this.gameState.gameOver };
+        }
         const result = this.physics.performHardDrop();
-        
+
         // Update score display for hard drop points
         this.renderer.updateScore(this.gameState.score);
-        
+
         if (result.gameOver) {
             this.handleGeneralGameOver();
-            return;
+            return { clearedLines: 0, gameOver: true };
         }
 
         // Update score display again if lines were cleared and show scoring popups
         if (result.clearedLines > 0) {
             this.renderer.updateScore(this.gameState.score);
-            
+
             // Show text for T-spins and special clears only (other spins are silent)
             if (result.displayInfo && (
                 result.displayInfo.clearType.includes('T-SPIN') ||
@@ -189,7 +191,7 @@ export class GameLogic {
                     result.displayInfo.b2bCount,
                     result.displayInfo.comboCount
                 );
-                
+
                 // Hide the texts after a delay
                 this.scene.time.delayedCall(2000, () => {
                     this.renderer.hideComboTexts();
@@ -200,6 +202,7 @@ export class GameLogic {
         // Immediate spawn like JSTRIS/TETR.IO
         this.spawnNewTetromino();
         this.renderer.drawGame();
+        return result;
     }
 
     public checkCollision(x: number, y: number, shape: number[][]): boolean {
@@ -247,4 +250,4 @@ export class GameLogic {
         }
         this.renderer.drawGame();
     }
-} 
+}

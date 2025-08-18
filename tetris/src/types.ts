@@ -67,4 +67,4 @@ export const DEFAULT_SETTINGS: GameSettings = {
         rotate180: ['ShiftLeft', 'Enter'],
         resetGame: ['KeyR', '-']
     }
-}; 
+};

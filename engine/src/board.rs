@@ -13,6 +13,7 @@ pub struct Board {
 
 #[derive(Clone, Debug)]
 pub struct ClearInfo {
+    pub cleared_lines: usize,
 }
 
 impl Board {
@@ -65,7 +66,8 @@ impl Board {
                     continue; // No blocks in this row of the piece's bounding box
                 }
 
-                let board_y = piece.y + i as i32;
+                // Align mask row 0 to anchor y-1 (mask indices 0..3 map to y-1, y+0, y+1, y+2)
+                let board_y = piece.y + (i as i32 - 1);
 
                 // Check vertical bounds
                 if board_y < 0 || board_y >= BOARD_HEIGHT as i32 {
@@ -98,7 +100,8 @@ impl Board {
     pub fn lock_piece(&mut self, piece: &Piece) -> bool {
         if let Some(mask) = piece.get_mask() {
             for (i, &row_mask) in mask.iter().enumerate() {
-                let board_y = piece.y + i as i32;
+                // Align with mask vertical indexing (see can_place_piece)
+                let board_y = piece.y + (i as i32 - 1);
                 if board_y >= 0 && board_y < BOARD_HEIGHT as i32 {
                     self.rows[board_y as usize] |= row_mask as u32;
                 }
@@ -110,7 +113,7 @@ impl Board {
     }
 
     pub fn clear_lines(&mut self) -> ClearInfo {
-        let mut _cleared_lines = 0;
+        let mut cleared_lines = 0;
         let mut new_rows = [0u32; BOARD_HEIGHT];
         let mut write_idx = BOARD_HEIGHT - 1;
 
@@ -122,13 +125,13 @@ impl Board {
                     write_idx -= 1;
                 }
             } else {
-                _cleared_lines += 1;
+                cleared_lines += 1;
             }
         }
 
         self.rows = new_rows;
         
-        ClearInfo {}
+        ClearInfo { cleared_lines }
     }
 
     // Get column heights for evaluation

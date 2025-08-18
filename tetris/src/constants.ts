@@ -19,7 +19,7 @@ export const HOLD_BOX_CONTENT_START_Y = UI_ELEMENTS_TOP_Y;
 
 // Board Area (Center)
 export const BOARD_OFFSET_X = HOLD_BOX_OFFSET_X + HOLD_AREA_WIDTH + GAP_BETWEEN_AREAS;
-export const BOARD_OFFSET_Y = UI_ELEMENTS_TOP_Y; 
+export const BOARD_OFFSET_Y = UI_ELEMENTS_TOP_Y;
 
 // Next Area (Right of Board)
 export const NEXT_AREA_WIDTH = BLOCK_SIZE * 4;
@@ -27,7 +27,7 @@ export const NEXT_AREA_OFFSET_X = BOARD_OFFSET_X + (BOARD_WIDTH_BLOCKS * BLOCK_S
 export const NEXT_TEXT_LABEL_Y = UI_ELEMENTS_TOP_Y + TEXT_LABEL_OFFSET_Y; // Vertically aligned with Hold text
 export const NEXT_QUEUE_CONTENT_START_Y = UI_ELEMENTS_TOP_Y; // Content starts at same Y as Hold content & Board
 
-export const PREVIEW_SLOT_HEIGHT = BLOCK_SIZE * 3; 
+export const PREVIEW_SLOT_HEIGHT = BLOCK_SIZE * 3;
 // --- End Layout Constants ---
 
 // Calculated logical dimensions for the game content (for stacked left layout)
@@ -186,4 +186,4 @@ export const TETROMINOES = {
         color: 0xffa500 // Orange
     }
 };
-export const TETROMINO_KEYS = Object.keys(TETROMINOES) as (keyof typeof TETROMINOES)[]; 
+export const TETROMINO_KEYS = Object.keys(TETROMINOES) as (keyof typeof TETROMINOES)[];

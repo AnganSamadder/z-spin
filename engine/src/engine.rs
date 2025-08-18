@@ -74,7 +74,7 @@ impl TetrisEngine {
                          current_x, current_y, current_rotation);
         }
         
-        let search_result = self.search_engine.search(&board_obj, piece_type, current_x, current_y, current_rotation, next_piece_type, strategy, self.arr, self.das, self.debug);
+        let search_result = self.search_engine.search(&board_obj, piece_type, current_x, current_y, current_rotation, next_piece_type, None, true, strategy, self.arr, self.das, self.debug);
         self.current_move_sequence = search_result.best_move.split(',').map(String::from).collect();
         self.sequence_index = 0;
         
@@ -106,7 +106,7 @@ impl TetrisEngine {
         let current_y = 0; // Default spawn y position  
         let current_rotation = 0; // Default spawn rotation
 
-        let search_result = self.search_engine.search(&board_obj, piece_type, current_x, current_y, current_rotation, next_piece_type, strategy, self.arr, self.das, true); // Debug is true for this function
+        let search_result = self.search_engine.search(&board_obj, piece_type, current_x, current_y, current_rotation, next_piece_type, None, true, strategy, self.arr, self.das, true); // Debug is true for this function
         search_result.best_move
     }
 
@@ -125,7 +125,7 @@ impl TetrisEngine {
         let next_piece_type = PieceType::from_i32(next_piece);
 
         // Generate new move sequence using actual current piece position
-        let search_result = self.search_engine.search(&board_obj, piece_type, current_x, current_y, current_rotation, next_piece_type, strategy, self.arr, self.das, self.debug);
+        let search_result = self.search_engine.search(&board_obj, piece_type, current_x, current_y, current_rotation, next_piece_type, None, true, strategy, self.arr, self.das, self.debug);
         self.current_move_sequence = search_result.best_move.split(',').map(String::from).collect();
         self.sequence_index = 0;
         
@@ -141,13 +141,51 @@ impl TetrisEngine {
         }
     }
 
+    // New: accept hold info
+    pub fn get_best_move_with_position_and_hold(&mut self, board: &[i32], current_piece: i32, current_x: i32, current_y: i32, current_rotation: usize, next_piece: i32, held_piece: i32, can_hold: bool, strategy: Strategy) -> String {
+        if self.sequence_index < self.current_move_sequence.len() {
+            let next_move = self.current_move_sequence[self.sequence_index].clone();
+            self.sequence_index += 1;
+            return next_move;
+        }
+
+        let board_obj = Board::from_flat_array(board);
+        let piece_type = PieceType::from_i32(current_piece).unwrap_or(PieceType::I);
+        let next_piece_type = PieceType::from_i32(next_piece);
+        let held_piece_type = PieceType::from_i32(held_piece);
+
+        let search_result = self.search_engine.search(&board_obj, piece_type, current_x, current_y, current_rotation, next_piece_type, held_piece_type, can_hold, strategy, self.arr, self.das, self.debug);
+        self.current_move_sequence = search_result.best_move.split(',').map(String::from).collect();
+        self.sequence_index = 0;
+        if !self.current_move_sequence.is_empty() && self.current_move_sequence[0] != "" {
+            let next_move = self.current_move_sequence[self.sequence_index].clone();
+            self.sequence_index += 1;
+            next_move
+        } else {
+            self.current_move_sequence = vec!["hard_drop".to_string()];
+            self.sequence_index = 1;
+            "hard_drop".to_string()
+        }
+    }
+
     /// New method that returns full move sequence with current piece position
     pub fn get_full_move_sequence_with_position(&mut self, board: &[i32], current_piece_idx: i32, current_x: i32, current_y: i32, current_rotation: usize, next_piece_idx: i32, strategy: Strategy) -> String {
         let board_obj = Board::from_flat_array(board);
         let piece_type = PieceType::from_i32(current_piece_idx).unwrap_or(PieceType::I);
         let next_piece_type = PieceType::from_i32(next_piece_idx);
 
-        let search_result = self.search_engine.search(&board_obj, piece_type, current_x, current_y, current_rotation, next_piece_type, strategy, self.arr, self.das, true); // Debug is true for this function
+        let search_result = self.search_engine.search(&board_obj, piece_type, current_x, current_y, current_rotation, next_piece_type, None, true, strategy, self.arr, self.das, true); // Debug is true for this function
+        search_result.best_move
+    }
+
+    // New: full sequence with hold info
+    pub fn get_full_move_sequence_with_position_and_hold(&mut self, board: &[i32], current_piece_idx: i32, current_x: i32, current_y: i32, current_rotation: usize, next_piece_idx: i32, held_piece_idx: i32, can_hold: bool, strategy: Strategy) -> String {
+        let board_obj = Board::from_flat_array(board);
+        let piece_type = PieceType::from_i32(current_piece_idx).unwrap_or(PieceType::I);
+        let next_piece_type = PieceType::from_i32(next_piece_idx);
+        let held_piece_type = PieceType::from_i32(held_piece_idx);
+
+        let search_result = self.search_engine.search(&board_obj, piece_type, current_x, current_y, current_rotation, next_piece_type, held_piece_type, can_hold, strategy, self.arr, self.das, true);
         search_result.best_move
     }
 } 

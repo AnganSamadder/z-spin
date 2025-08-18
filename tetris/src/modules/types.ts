@@ -14,4 +14,4 @@ export {
     GameSettings,
     DEFAULT_SETTINGS,
     // Include other types as needed
-}; 
+};

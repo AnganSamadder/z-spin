@@ -4,6 +4,7 @@ import { GameSettings, DEFAULT_SETTINGS } from '../types';
 import { GameState } from '../modules/state/GameState';
 import { InputHandler } from '../modules/input/InputHandler';
 import { GameRenderer } from '../modules/rendering/GameRenderer';
+import { DebugPanel } from '../modules/rendering/DebugPanel';
 import { GameLogic } from '../modules/logic/GameLogic';
 import { WasmEngine } from '../modules/wasm/WasmEngine';
 import WasmLoader from '../modules/wasm/WasmLoader';
@@ -17,11 +18,14 @@ export class GameScene extends Phaser.Scene {
     private fallTimer: Phaser.Time.TimerEvent | null = null;
     private inputHandler!: InputHandler;
     public gameRenderer!: GameRenderer;
+    public debugPanel!: DebugPanel;
     public gameLogic!: GameLogic;
     private wasmEngine!: WasmEngine;
     public isWasmActive: boolean = false;
     private wasmToggleButton: HTMLButtonElement | null = null;
     private wasmDebugButton: HTMLButtonElement | null = null;
+    private debugModeButton: HTMLButtonElement | null = null;
+    private isDebugModeOn: boolean = true;
 
     private lockDelayTimer: Phaser.Time.TimerEvent | null = null;
     private lockDelayDuration: number = 500;
@@ -38,11 +42,13 @@ export class GameScene extends Phaser.Scene {
             this.registry.set('gameSettings', { ...DEFAULT_SETTINGS });
         }
         const currentSettings: GameSettings = this.registry.get('gameSettings');
-        
+
         this.inputHandler = new InputHandler(this);
         this.gameRenderer = new GameRenderer(this);
+        this.debugPanel = new DebugPanel(this);
+        this.debugPanel.init();
         this.gameLogic = new GameLogic(this, this.gameState, this.gameRenderer);
-        
+
         // Initialize the WASM engine
         this.wasmEngine = new WasmEngine(this);
         const wasmLoader = WasmLoader.getInstance();
@@ -99,7 +105,7 @@ export class GameScene extends Phaser.Scene {
         }
     }
 
-    private moveBlockDownRegularFall(): void { 
+    private moveBlockDownRegularFall(): void {
         if (this.gameState.isSoftDropping) return;
         this.gameLogic.moveBlockDown(false);
     }
@@ -172,7 +178,7 @@ export class GameScene extends Phaser.Scene {
             }
         }
     }
-    
+
     public endFallTimer(): void {
         if (this.fallTimer) this.fallTimer.remove();
     }
@@ -180,12 +186,12 @@ export class GameScene extends Phaser.Scene {
     private setupWasmToggleButton(): void {
         // Find the existing HTML button
         this.wasmToggleButton = document.getElementById('wasmToggleBtn') as HTMLButtonElement;
-        
+
         if (!this.wasmToggleButton) {
             console.error('Could not find WASM toggle button in HTML');
             return;
         }
-        
+
         // Add event listener to the button
         this.wasmToggleButton.addEventListener('click', () => {
             this.toggleWasmEngine();
@@ -193,16 +199,31 @@ export class GameScene extends Phaser.Scene {
 
         // Setup debug button
         this.wasmDebugButton = document.getElementById('wasmDebugBtn') as HTMLButtonElement;
-        
+
         if (!this.wasmDebugButton) {
             console.error('Could not find WASM debug button in HTML');
             return;
         }
-        
+
         // Add event listener to the debug button
         this.wasmDebugButton.addEventListener('click', () => {
             this.debugNextMove();
         });
+
+        // Setup debug mode toggle button
+        this.debugModeButton = document.getElementById('debugModeBtn') as HTMLButtonElement;
+
+        if (!this.debugModeButton) {
+            console.error('Could not find debug mode button in HTML');
+            return;
+        }
+
+        // Add event listener to the debug mode button
+        this.debugModeButton.addEventListener('click', () => {
+            this.toggleDebugMode();
+        });
+
+        this.updateDebugModeUI();
     }
 
     private toggleWasmEngine(): void {
@@ -210,10 +231,10 @@ export class GameScene extends Phaser.Scene {
             console.error('WASM engine not initialized');
             return;
         }
-        
+
         this.isWasmActive = !this.isWasmActive;
         this.gameState.isWasmMode = this.isWasmActive;
-        
+
         console.log(`WASM engine is now ${this.isWasmActive ? 'active' : 'inactive'}`);
         if (this.wasmToggleButton) {
             this.wasmToggleButton.textContent = this.isWasmActive ? 'Play JS Engine' : 'Play WASM Engine';
@@ -224,7 +245,7 @@ export class GameScene extends Phaser.Scene {
         } else {
             this.wasmEngine.deactivate();
         }
-        
+
         console.log(`B2B state preserved: active=${this.gameState.backToBackActive}, count=${this.gameState.backToBackCount}`);
         console.log(`Combo state preserved: ${this.gameState.comboCount}`);
     }
@@ -242,5 +263,72 @@ export class GameScene extends Phaser.Scene {
 
         // Call the WASM engine to get the best move with detailed logging
         this.wasmEngine.getBestMoveDebug();
+    }
+
+    private toggleDebugMode(): void {
+        this.isDebugModeOn = !this.isDebugModeOn;
+        this.updateDebugModeUI();
+    }
+
+    private updateDebugModeUI(): void {
+        const debugPanelRoot = document.getElementById('debugPanelRoot');
+
+        if (!debugPanelRoot || !this.debugModeButton) return;
+
+        if (this.isDebugModeOn) {
+            // Show full debug panel
+            this.debugModeButton.textContent = 'Debug: On';
+            debugPanelRoot.style.display = 'block';
+            this.debugPanel.init(); // Re-initialize with full UI
+        } else {
+            // Show simplified debug panel
+            this.debugModeButton.textContent = 'Debug: Off';
+            this.createSimpleDebugUI(debugPanelRoot);
+        }
+    }
+
+    private createSimpleDebugUI(container: HTMLElement): void {
+        container.innerHTML = '';
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.justifyContent = 'center';
+        container.style.alignItems = 'center';
+        container.style.gap = '20px';
+
+        const title = document.createElement('div');
+        title.textContent = 'Simple Debug Mode';
+        title.style.fontWeight = 'bold';
+        title.style.fontSize = '18px';
+        title.style.marginBottom = '20px';
+        container.appendChild(title);
+
+        const playEngineBtn = document.createElement('button');
+        playEngineBtn.textContent = this.isWasmActive ? 'Stop WASM Engine' : 'Play WASM Engine';
+        playEngineBtn.style.padding = '12px 24px';
+        playEngineBtn.style.fontSize = '16px';
+        playEngineBtn.style.cursor = 'pointer';
+        playEngineBtn.style.backgroundColor = '#333';
+        playEngineBtn.style.color = 'white';
+        playEngineBtn.style.border = '1px solid #555';
+        playEngineBtn.style.borderRadius = '4px';
+        playEngineBtn.addEventListener('click', () => {
+            this.toggleWasmEngine();
+            playEngineBtn.textContent = this.isWasmActive ? 'Stop WASM Engine' : 'Play WASM Engine';
+        });
+        container.appendChild(playEngineBtn);
+
+        const debugMoveBtn = document.createElement('button');
+        debugMoveBtn.textContent = 'Debug One Move';
+        debugMoveBtn.style.padding = '12px 24px';
+        debugMoveBtn.style.fontSize = '16px';
+        debugMoveBtn.style.cursor = 'pointer';
+        debugMoveBtn.style.backgroundColor = '#333';
+        debugMoveBtn.style.color = 'white';
+        debugMoveBtn.style.border = '1px solid #555';
+        debugMoveBtn.style.borderRadius = '4px';
+        debugMoveBtn.addEventListener('click', () => {
+            this.debugNextMove();
+        });
+        container.appendChild(debugMoveBtn);
     }
 }

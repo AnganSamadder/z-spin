@@ -71,19 +71,8 @@ impl WasmTetrisEngine {
         console_log!("🎮 ENGINE: getBestMoveWithPosition called - piece: {}, position: ({}, {}) rotation: {}, next: {}", 
                      current_piece, current_x, current_y, current_rotation, next_piece);
         
-        // CRITICAL FIX: Handle buffer area coordinates properly
-        let (rust_x, rust_y) = if current_y < 20 {
-            // Piece is in buffer area (y=0-19) - convert to visible area coordinates
-            let visible_y = current_y + 20;
-            console_log!("🔧 COORDINATE MAPPING: JS buffer ({}, {}) → Rust visible ({}, {})", 
-                        current_x, current_y, current_x, visible_y);
-            (current_x, visible_y)
-        } else {
-            // Piece is in visible area (y=20-39) - use coordinates directly
-            console_log!("🔧 COORDINATE MAPPING: JS ({}, {}) → Rust ({}, {}) (direct mapping)", 
-                        current_x, current_y, current_x, current_y);
-            (current_x, current_y)
-        };
+        // Use direct mapping; JS passes visible-space coordinates
+        let (rust_x, rust_y) = (current_x, current_y);
         
         // Create the board and validate coordinates
         let rust_board = crate::board::Board::from_flat_array(&board);
@@ -114,31 +103,13 @@ impl WasmTetrisEngine {
         let board_rows = board.len() / 10;
         console_log!("📐 Rows={} JSpos=({}, {})", board_rows, current_x, current_y);
         
-        // CRITICAL FIX: Handle buffer area coordinates properly
-        let (rust_x, rust_y) = if current_y < 20 {
-            // Piece is in buffer area (y=0-19) - JavaScript only sent visible data (20 rows)
-            // We need to convert buffer coordinates to equivalent visible coordinates
-            console_log!("  🔧 BUFFER AREA DETECTED: JS y={} is in buffer (0-19)", current_y);
-            console_log!("  🔧 Converting to visible area coordinates...");
-            
-            // Map buffer y-coordinate to visible area
-            // If piece is at y=23 in buffer, it should be at y=43 in full coordinate system
-            // But since our board is only 40 rows, we need to offset appropriately
-            let visible_y = current_y + 20; // Convert buffer coordinate to visible coordinate
-            console_log!("  🔧 COORDINATE MAPPING: JS buffer ({}, {}) → Rust visible ({}, {})", 
-                        current_x, current_y, current_x, visible_y);
-            (current_x, visible_y)
-        } else {
-            // Piece is already in visible area (y=20-39) - use coordinates directly
-            console_log!("  🔧 COORDINATE MAPPING: JS ({}, {}) → Rust ({}, {}) (direct mapping - same coordinate space!)", 
-                        current_x, current_y, current_x, current_y);
-            (current_x, current_y)
-        };
+        // Use direct mapping; JS passes visible-space coordinates
+        let (rust_x, rust_y) = (current_x, current_y);
         
         // Create the board from flat array (this maps JS data to Rust rows 20-39)
         let rust_board = crate::board::Board::from_flat_array(&board);
         
-        // Validate the converted coordinates
+        // Validate the coordinates
         let piece_type = crate::pieces::PieceType::from_i32(current_piece).unwrap_or(crate::pieces::PieceType::T);
         let test_piece = crate::pieces::Piece::new(piece_type, rust_x, rust_y).with_rotation(current_rotation as usize);
         
@@ -199,6 +170,21 @@ impl WasmTetrisEngine {
         console_log!("🎯 FINAL MOVE SEQUENCE: {}", move_sequence);
 
         move_sequence
+    }
+
+    // New: hold-aware bindings
+    #[wasm_bindgen(js_name = getBestMoveWithPositionAndHold)]
+    pub fn get_best_move_with_position_and_hold(&mut self, board: Vec<i32>, current_piece: i32, current_x: i32, current_y: i32, current_rotation: i32, next_piece: i32, held_piece: i32, can_hold: bool, strategy: Strategy) -> String {
+        // Use direct mapping; JS passes visible-space coordinates consistently
+        let (rust_x, rust_y) = (current_x, current_y);
+        self.engine.get_best_move_with_position_and_hold(&board, current_piece, rust_x, rust_y, current_rotation as usize, next_piece, held_piece, can_hold, strategy)
+    }
+
+    #[wasm_bindgen(js_name = getFullMoveSequenceWithPositionAndHold)]
+    pub fn get_full_move_sequence_with_position_and_hold(&mut self, board: Vec<i32>, current_piece: i32, current_x: i32, current_y: i32, current_rotation: i32, next_piece: i32, held_piece: i32, can_hold: bool, strategy: Strategy) -> String {
+        // Use direct mapping; JS passes visible-space coordinates consistently
+        let (rust_x, rust_y) = (current_x, current_y);
+        self.engine.get_full_move_sequence_with_position_and_hold(&board, current_piece, rust_x, rust_y, current_rotation as usize, next_piece, held_piece, can_hold, strategy)
     }
 
     // Legacy methods for compatibility

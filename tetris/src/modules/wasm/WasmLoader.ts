@@ -46,49 +46,42 @@ class WasmTetrisEngineWrapper implements WasmTetrisEngine {
     'hard_drop',
     'hard_drop',
   ];
-  
+
   constructor() {
-    console.log('WasmTetrisEngineWrapper constructor called');
+    // WASM Engine wrapper initialized
   }
-  
+
   reset(): void {
-    console.log('WasmTetrisEngineWrapper.reset() called');
     this.score = 0;
     this.gameOver = false;
   }
-  
+
   move_left(): boolean {
-    console.log('WasmTetrisEngineWrapper.move_left() called');
     return true;
   }
-  
+
   move_right(): boolean {
-    console.log('WasmTetrisEngineWrapper.move_right() called');
     return true;
   }
-  
+
   move_down(): boolean {
-    console.log('WasmTetrisEngineWrapper.move_down() called');
     this.score += 1;
     return true;
   }
-  
+
   rotate(): boolean {
-    console.log('WasmTetrisEngineWrapper.rotate() called');
     return true;
   }
-  
+
   spawn_tetromino(typeKey: number): boolean {
-    console.log('WasmTetrisEngineWrapper.spawn_tetromino() called with', typeKey);
     return true;
   }
-  
+
   get_game_state_json(): string {
-    const state = { 
-      score: this.score, 
-      gameOver: this.gameOver 
+    const state = {
+      score: this.score,
+      gameOver: this.gameOver
     };
-    console.log('WasmTetrisEngineWrapper.get_game_state_json() called', state);
     return JSON.stringify(state);
   }
 
@@ -96,10 +89,8 @@ class WasmTetrisEngineWrapper implements WasmTetrisEngine {
     if (this.moveIndex < this.moveQueue.length) {
       const move = this.moveQueue[this.moveIndex];
       this.moveIndex++;
-      console.log(`[WASM WRAPPER] Executing move ${this.moveIndex}: ${move}`);
       return move;
     }
-    console.log('[WASM WRAPPER] Move queue empty.');
     return ''; // Return empty string for no-op
   }
 
@@ -125,7 +116,7 @@ class WasmLoader {
   public static readonly TETROMINO_TYPE_MAP: { [key: string]: number } = {
     'I': 0,
     'O': 1,
-    'T': 2, 
+    'T': 2,
     'S': 3,
     'Z': 4,
     'J': 5,
@@ -167,52 +158,52 @@ class WasmLoader {
 
     try {
       this.isLoading = true;
-      
+
       // Dynamically load the WASM module from the server
       this.log('Loading WASM module');
-      
+
       // First check if the WASM binary is accessible
       const wasmBinaryResponse = await fetch('/wasm/z_spin_engine_bg.wasm');
       if (!wasmBinaryResponse.ok) {
         throw new Error(`Failed to fetch WASM binary: ${wasmBinaryResponse.status} ${wasmBinaryResponse.statusText}`);
       }
-      
+
       // Now load the JS module
       const jsModuleResponse = await fetch('/wasm/z_spin_engine.js');
       if (!jsModuleResponse.ok) {
         throw new Error(`Failed to fetch JS module: ${jsModuleResponse.status} ${jsModuleResponse.statusText}`);
       }
-      
+
       const jsModuleText = await jsModuleResponse.text();
-      
+
       // Create a blob URL for the JS module
       const blob = new Blob([jsModuleText], { type: 'application/javascript' });
       const blobUrl = URL.createObjectURL(blob);
-      
+
       // Import the module
       const wasmModule = await import(/* @vite-ignore */ blobUrl);
-      
+
       // Clean up the blob URL
       URL.revokeObjectURL(blobUrl);
-      
-      this.log('Module imported', { 
+
+      this.log('Module imported', {
         keys: Object.keys(wasmModule),
         hasDefault: !!wasmModule.default
       });
-      
+
       // Initialize the WASM module
       this.log('Initializing WASM module');
       this.wasmInitPromise = wasmModule.default('/wasm/z_spin_engine_bg.wasm');
       const initialized = await this.wasmInitPromise;
-      
+
       this.log('WASM module initialized', {
         memory: !!initialized?.memory,
         exports: !!initialized?.__wbindgen_start
       });
-      
+
       // Store the module for future use
       this.wasmModule = wasmModule;
-      
+
       // Check if WasmTetrisEngine is available in the module
       try {
         if (this.wasmModule.WasmTetrisEngine) {
@@ -226,11 +217,11 @@ class WasmLoader {
         this.log('Error accessing WasmTetrisEngine, using wrapper', error);
         this.engineClass = WasmTetrisEngineWrapper;
       }
-      
+
       this.log('WASM module loaded successfully', {
         engineClass: this.engineClass ? this.engineClass.name || 'Anonymous' : 'None'
       });
-      
+
       this.isLoading = false;
       return;
     } catch (error) {
@@ -242,12 +233,12 @@ class WasmLoader {
 
   public createEngine(): WasmTetrisEngine | null {
     this.log('Creating engine');
-    
+
     if (!this.engineClass) {
       console.error('Engine class not available. Call loadWasmModule() first.');
       return null;
     }
-    
+
     try {
       const engine = new this.engineClass();
       this.log('Engine created successfully');
@@ -263,4 +254,4 @@ class WasmLoader {
   }
 }
 
-export default WasmLoader; 
+export default WasmLoader;

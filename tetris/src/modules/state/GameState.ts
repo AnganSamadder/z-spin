@@ -33,7 +33,7 @@ export class GameState {
             this.board[y] = Array(BOARD_WIDTH_BLOCKS).fill(null);
         }
     }
-    
+
     // Reset the board without affecting other game state
     public resetBoard(): void {
         for (let y = 0; y < LOGICAL_BOARD_HEIGHT_BLOCKS; y++) {
@@ -71,16 +71,16 @@ export class GameState {
         }
         return this.currentBag.pop()!;
     }
-    
+
     // Get the next tetromino from the queue for WASM engine
     public getNextTetromino(): HeldTetrominoState | null {
         if (this.nextTetrominoQueue.length === 0) {
             return null;
         }
-        
+
         // Remove the first piece and shift the queue
         const next = this.nextTetrominoQueue.shift();
-        
+
         // Fill the queue if it's getting low
         if (this.nextTetrominoQueue.length < 5) {
             // Add a new piece to the end of the queue
@@ -89,10 +89,10 @@ export class GameState {
                 typeKey: nextType
             });
         }
-        
+
         return next || null;
     }
-    
+
     public reset(): void {
         this.initBoard();
         this.score = 0;
@@ -112,4 +112,4 @@ export class GameState {
         this.isSoftDropping = false;
         this.fillCurrentBag();
     }
-} 
+}

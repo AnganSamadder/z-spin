@@ -141,7 +141,7 @@ export class InputHandler {
 
         let isLeftPressed = this.actionKeyObjects.moveLeft?.some(k => k.isDown) ?? false;
         let isRightPressed = this.actionKeyObjects.moveRight?.some(k => k.isDown) ?? false;
-        
+
         if (isDownPressed) {
             if (this.sdf === Infinity) {
                 // When SDF is infinity, drop all the way to bottom instantly
@@ -225,4 +225,4 @@ export class InputHandler {
             this.dasTimerLeft = 0;
         }
     }
-} 
+}
