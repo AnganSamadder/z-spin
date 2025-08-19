@@ -36,6 +36,9 @@ export const PREVIEW_SLOT_HEIGHT = BLOCK_SIZE * 3;
 export const LOGICAL_GAME_WIDTH = BOARD_OFFSET_X + (BOARD_WIDTH_BLOCKS * BLOCK_SIZE) + UI_SIDE_MARGIN; // Adjusted for clarity
 export const LOGICAL_GAME_HEIGHT = BOARD_OFFSET_Y + (VISIBLE_BOARD_HEIGHT_BLOCKS * BLOCK_SIZE) + (BLOCK_SIZE * 3); // More bottom margin
 
+// UI padding/gutter values
+export const BOARD_TEXT_GUTTER = Math.floor(BLOCK_SIZE * 0.3); // horizontal padding between board edge and text
+
 
 // SRS Wall Kick Data
 // (x, y) offsets: +x is right, +y is UP (will need to adjust for board's y-down)

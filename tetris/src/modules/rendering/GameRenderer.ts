@@ -19,6 +19,7 @@ import {
     NEXT_QUEUE_CONTENT_START_Y,
     PREVIEW_SLOT_HEIGHT,
     TETROMINOES,
+    BOARD_TEXT_GUTTER,
 } from '../../constants';
 
 export class GameRenderer {
@@ -32,6 +33,7 @@ export class GameRenderer {
     private comboText: Phaser.GameObjects.Text;
     private backToBackText: Phaser.GameObjects.Text;
     private actualComboText: Phaser.GameObjects.Text;
+    private statsText: Phaser.GameObjects.Text;
 
     constructor(scene: GameScene) {
         this.scene = scene;
@@ -67,6 +69,14 @@ export class GameRenderer {
             '',
             { font: `${BLOCK_SIZE * 0.9}px Arial`, color: '#FFFF00', align: 'center', stroke: '#000000', strokeThickness: 3 }
         ).setOrigin(0.5).setVisible(false);
+
+        // Live stats text (left column under Hold area), aligned with board bottom
+        this.statsText = this.scene.add.text(
+            BOARD_OFFSET_X - BOARD_TEXT_GUTTER,
+            BOARD_OFFSET_Y + VISIBLE_BOARD_HEIGHT_BLOCKS * BLOCK_SIZE,
+            '',
+            { font: `${Math.floor(BLOCK_SIZE * 0.6)}px Arial`, color: '#ffffff', align: 'right' }
+        ).setOrigin(1, 1);
     }
 
     public updateScore(score: number): void {
@@ -331,6 +341,33 @@ export class GameRenderer {
                 this.drawPreview(pieceToPreview, NEXT_AREA_OFFSET_X, NEXT_QUEUE_CONTENT_START_Y + i * PREVIEW_SLOT_HEIGHT, NEXT_AREA_WIDTH);
             }
         }
+
+        // Update live stats last to ensure it's current
+        this.updateStatsText();
+    }
+
+    private updateStatsText(): void {
+        const totalKeys = (this.gameState.humanKeyPresses || 0) + (this.gameState.engineKeyPresses || 0);
+        const totalPieces = this.gameState.totalPiecesPlaced || 0;
+        const totalLines = this.gameState.totalLinesCleared || 0;
+        const elapsedSec = Math.max(0.001, (Date.now() - (this.gameState.gameStartTimestampMs || Date.now())) / 1000);
+        const kpp = totalPieces > 0 ? totalKeys / totalPieces : 0;
+        const pps = totalPieces / elapsedSec;
+
+        const text = [
+            'Keys:',
+            `${totalKeys} total, KPP ${kpp.toFixed(2)}`,
+            '',
+            'Pieces:',
+            `${totalPieces} total, PPS ${pps.toFixed(2)}`,
+            '',
+            'Lines:',
+            `${totalLines} cleared`,
+        ].join('\n');
+
+        this.statsText.setText(text);
+        // Ensure position remains aligned if constants/layout change dynamically in future
+        this.statsText.setPosition(BOARD_OFFSET_X - BOARD_TEXT_GUTTER, BOARD_OFFSET_Y + VISIBLE_BOARD_HEIGHT_BLOCKS * BLOCK_SIZE).setOrigin(1, 1);
     }
 
     private drawPreview(piece: HeldTetrominoState, x: number, y: number, areaWidth: number): void {

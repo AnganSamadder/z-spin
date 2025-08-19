@@ -23,7 +23,15 @@ impl SearchEngine {
     }
 
     pub fn search(&mut self, board: &Board, current_piece: PieceType, current_x: i32, current_y: i32, current_rotation: usize, _next_piece: Option<PieceType>, held_piece: Option<PieceType>, can_hold: bool, strategy: Strategy, arr: u32, das: u32, debug: bool) -> SearchResult {
-        let weights = EvaluationWeights::new(strategy);
+        let mut weights = EvaluationWeights::new(strategy);
+        // Simple 7-bag heuristic: if I is not among current/next/held, discourage deepening the right well
+        let i_is_nearby = current_piece == PieceType::I
+            || _next_piece == Some(PieceType::I)
+            || held_piece == Some(PieceType::I);
+        if i_is_nearby {
+            // No extra penalty if an I is imminent
+            weights.well_depth_without_i_penalty = 0.0;
+        }
         let (seq_curr, _placement_curr, score_curr) = self.find_best_move_for_strategy(board, current_piece, current_x, current_y, current_rotation, &weights, arr, das, debug);
 
         // Consider hold option if available
@@ -170,26 +178,50 @@ impl SearchEngine {
                 board_after.lock_piece(&piece);
                 let cleared = board_after.clear_lines();
                 let (agg_h, max_h, holes, bump) = board_after.get_evaluation_metrics();
+                // Right well diagnostics
+                let heights = board_after.get_heights();
+                let right_col = crate::board::BOARD_WIDTH - 1;
+                let right_h = heights[right_col] as f64;
+                let mut right_fill_rows = 0.0;
+                let mut tetris_ready_rows = 0.0;
+                let start_row = crate::board::BOARD_HEIGHT - crate::board::VISIBLE_HEIGHT;
+                for y in start_row..crate::board::BOARD_HEIGHT {
+                    let left_full = (0..right_col).all(|x| board_after.get_cell(x, y));
+                    let right_full = board_after.get_cell(right_col, y);
+                    if right_full { right_fill_rows += 1.0; }
+                    if left_full && !right_full { tetris_ready_rows += 1.0; }
+                }
                 let w = weights;
                 let s = agg_h * w.aggregate_height
                       + max_h * w.max_height
                       + holes * w.holes
                       + bump * w.bumpiness
-                      + (cleared.cleared_lines as f64) * w.completed_lines;
-                (agg_h, max_h, holes, bump, cleared.cleared_lines as f64, s)
+                      + (cleared.cleared_lines as f64) * w.completed_lines
+                      - w.right_well_height_penalty * right_h
+                      - w.right_well_fill_penalty * right_fill_rows
+                      + w.tetris_ready_bonus * tetris_ready_rows
+                      + w.bumpiness_well_relief * (heights[right_col - 1] as f64 - heights[right_col] as f64).abs()
+                      - w.well_depth_without_i_penalty * right_h
+                      + if cleared.cleared_lines == 4 { w.tetris_clear_bonus } else { -(cleared.cleared_lines as f64) * w.non_tetris_clear_penalty_per_line };
+                // New holes diagnostic
+                let (_a0,_m0, holes_before, _b0) = board.get_evaluation_metrics();
+                let new_holes = (holes - holes_before).max(0.0);
+                (agg_h, max_h, holes, bump, cleared.cleared_lines as f64, right_h, right_fill_rows, tetris_ready_rows, new_holes, s)
             };
 
             // Log top 2 choices if available
             let top_count = if all_evaluations.len() > 1 { 2 } else { 1 };
             for i in 0..top_count {
                 let (p, _ev) = &all_evaluations[i];
-                let (agg_h, max_h, holes, bump, lines, s) = explain(p);
+                let (agg_h, max_h, holes, bump, lines, right_h, right_fill_rows, t_ready, new_holes, s) = explain(p);
                 console_log!(
-                    "📊 EVAL CHOICE #{}: x={}, y={}, rot={} | aggH={:.1}, maxH={:.1}, bump={:.1}, holes={:.1}, lines_cleared={:.0} | weights: (ah={:.2}, mh={:.2}, bp={:.2}, ho={:.2}, ln={:.2}) | score={:.2}",
+                    "📊 EVAL CHOICE #{}: x={}, y={}, rot={} | aggH={:.1}, maxH={:.1}, bump={:.1}, holes={:.1}, newHoles={:.1}, lines_cleared={:.0} | rightH={:.1}, rightFillRows={:.0}, tReadyRows={:.0} | weights: (ah={:.2}, mh={:.2}, bp={:.2}, ho={:.2}, ln={:.2}, rwH={:.2}, rwF={:.2}, tR={:.2}, wellRel={:.2}, noI={:.2}, tetrB={:.2}, nonTpen={:.2}, newHpen={:.2}) | score={:.2}",
                     i+1,
                     p.x, p.y, p.rotation,
-                    agg_h, max_h, bump, holes, lines,
+                    agg_h, max_h, bump, holes, new_holes, lines, right_h, right_fill_rows, t_ready,
                     weights.aggregate_height, weights.max_height, weights.bumpiness, weights.holes, weights.completed_lines,
+                    weights.right_well_height_penalty, weights.right_well_fill_penalty, weights.tetris_ready_bonus,
+                    weights.bumpiness_well_relief, weights.well_depth_without_i_penalty, weights.tetris_clear_bonus, weights.non_tetris_clear_penalty_per_line, weights.new_holes_penalty,
                     s
                 );
             }
@@ -215,7 +247,7 @@ impl SearchEngine {
             }
         }
         
-        // 🎯 SMART PATHFINDING POST-PROCESSING: Fix rotation timing issues
+        // 🎯 SMART PATHFINDING POST-PROCESSING: Fix rotation timing issues and insert micro-drops before rotations when helpful
         let mut improved_sequence = Vec::new();
         let mut sim_piece = Piece::new(current_piece, current_x, current_y).with_rotation(current_rotation);
         
@@ -238,6 +270,13 @@ impl SearchEngine {
                     }
                 },
                 "rotate_ccw" => {
+                    // Micro soft-drop to open rotation if blocked at current y
+                    if sim_piece.try_rotate_counter_clockwise(board).is_none() {
+                        if board.can_place_piece(&sim_piece.moved(0, 1)) {
+                            sim_piece = sim_piece.moved(0, 1);
+                            improved_sequence.push("move_down".to_string());
+                        }
+                    }
                     if let Some(rotated) = sim_piece.try_rotate_counter_clockwise(board) {
                         sim_piece = rotated;
                         improved_sequence.push(move_action.clone());
@@ -273,6 +312,12 @@ impl SearchEngine {
                     }
                 },
                 "rotate" => {
+                    if sim_piece.try_rotate_clockwise(board).is_none() {
+                        if board.can_place_piece(&sim_piece.moved(0, 1)) {
+                            sim_piece = sim_piece.moved(0, 1);
+                            improved_sequence.push("move_down".to_string());
+                        }
+                    }
                     let _initial_pos = (sim_piece.x, sim_piece.y);
                     if let Some(rotated) = sim_piece.try_rotate_clockwise(board) {
                         sim_piece = rotated;
@@ -307,6 +352,12 @@ impl SearchEngine {
                     }
                 },
                 "rotate_180" => {
+                    if sim_piece.try_rotate_180(board).is_none() {
+                        if board.can_place_piece(&sim_piece.moved(0, 1)) {
+                            sim_piece = sim_piece.moved(0, 1);
+                            improved_sequence.push("move_down".to_string());
+                        }
+                    }
                     if let Some(rotated) = sim_piece.try_rotate_180(board) {
                         sim_piece = rotated;
                         improved_sequence.push(move_action.clone());
@@ -557,6 +608,8 @@ impl SearchEngine {
         }
 
         let mut predicted_board = board.clone();
+        // Count holes before placement
+        let (_agg_h0, _max_h0, holes_before, _bump0) = predicted_board.get_evaluation_metrics();
         predicted_board.lock_piece(&piece);
         let cleared = predicted_board.clear_lines();
         
@@ -565,7 +618,21 @@ impl SearchEngine {
         // Incorporate line clear reward directly here to ensure evaluation sees it
         let mut eval = predicted_board.evaluate(weights).score;
         if cleared.cleared_lines > 0 {
+            // Base per-line reward
             eval += (cleared.cleared_lines as f64) * weights.completed_lines;
+            // Strong global preference for tetrises
+            if cleared.cleared_lines == 4 {
+                eval += weights.tetris_clear_bonus;
+            } else {
+                // Penalize non-tetris clears per line to push engine toward 4-lines
+                eval -= (cleared.cleared_lines as f64) * weights.non_tetris_clear_penalty_per_line;
+            }
+        }
+        // Apply strong penalty for new holes introduced by this placement
+        let (_agg_h1, _max_h1, holes_after, _bump1) = predicted_board.get_evaluation_metrics();
+        let new_holes = (holes_after - holes_before).max(0.0);
+        if new_holes > 0.0 && weights.new_holes_penalty > 0.0 {
+            eval -= new_holes * weights.new_holes_penalty;
         }
 
         Some(PlacementEvaluation {
@@ -826,11 +893,14 @@ impl SearchEngine {
             // Single-step horizontal moves for precise alignment
             let step_left = piece.moved(-1, 0);
             if board.can_place_piece(&step_left) {
-                moves.push((step_left, "move_left", 1));
+                // When target is to the right, prefer not to step left unless it decreases kick depth or enables rotation
+                let prefer = if allow_soft_drops { 3 } else { 1 };
+                moves.push((step_left, "move_left", prefer));
             }
             let step_right = piece.moved(1, 0);
             if board.can_place_piece(&step_right) {
-                moves.push((step_right, "move_right", 1));
+                let prefer = if allow_soft_drops { 1 } else { 1 };
+                moves.push((step_right, "move_right", prefer));
             }
 
             // Soft drop / micro-drop - only allow if complex moves are permitted
@@ -841,7 +911,7 @@ impl SearchEngine {
                     moves.push((one_down, "move_down", 1));
                 }
 
-                // Full soft drop to floor (discourage before aligned)
+                // Full soft drop to floor (discourage before aligned). Also allow micro soft-drops before rotations
                 let mut sd_piece = piece.clone();
                 while board.can_place_piece(&sd_piece.moved(0, 1)) {
                     sd_piece.y += 1;
@@ -850,26 +920,29 @@ impl SearchEngine {
                     let misalign_x = (piece.x - target_x).abs() as usize;
                     let rot_mismatch = if piece.rotation == target_rot { 0 } else { 2 };
                     // Higher cost if not aligned horizontally or rotation not matching
-                    let sd_cost = 5 + misalign_x * 2 + rot_mismatch;
+                    let sd_cost = 6 + misalign_x * 3 + rot_mismatch;
                     moves.push((sd_piece, "soft_drop", sd_cost));
                 }
             }
 
-            // DAS-like moves - prioritize these for efficient long horizontal movement
-            let mut left_das_piece = piece.clone();
-            while board.can_place_piece(&left_das_piece.moved(-1, 0)) {
-                left_das_piece.x -= 1;
-            }
-            if left_das_piece.x != piece.x {
-                moves.push((left_das_piece, "move_to_left", 1)); // DAS hold counts as one input
-            }
+            // DAS-like moves: only use for simple placements. For complex (tuck/spin)
+            // we avoid wall-ride overshoot by forcing stepwise alignment.
+            if !allow_soft_drops {
+                let mut left_das_piece = piece.clone();
+                while board.can_place_piece(&left_das_piece.moved(-1, 0)) {
+                    left_das_piece.x -= 1;
+                }
+                if left_das_piece.x != piece.x {
+                    moves.push((left_das_piece, "move_to_left", 1)); // DAS hold counts as one input
+                }
 
-            let mut right_das_piece = piece.clone();
-            while board.can_place_piece(&right_das_piece.moved(1, 0)) {
-                right_das_piece.x += 1;
-            }
-            if right_das_piece.x != piece.x {
-                moves.push((right_das_piece, "move_to_right", 1));
+                let mut right_das_piece = piece.clone();
+                while board.can_place_piece(&right_das_piece.moved(1, 0)) {
+                    right_das_piece.x += 1;
+                }
+                if right_das_piece.x != piece.x {
+                    moves.push((right_das_piece, "move_to_right", 1));
+                }
             }
 
             for (next_piece, action, action_cost) in moves {

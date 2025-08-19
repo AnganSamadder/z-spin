@@ -2,7 +2,7 @@ export enum Strategy {
     Balanced = 'Balanced',
     Aggressive = 'Aggressive',
     Defensive = 'Defensive',
-    TSpan = 'TSpan',
+    NineZero = 'NineZero',
 }
 
 // Define GameSettings interface and default values
@@ -47,8 +47,8 @@ export interface HeldTetrominoState {
 export const DEFAULT_SETTINGS: GameSettings = {
     ghostPieceEnabled: true,
     gravityValue: 500,
-    arr: 16,
-    das: 133,
+    arr: 0,
+    das: 90,
     dcd: 0,
     sdf: Infinity,
     nextQueueSize: 5,

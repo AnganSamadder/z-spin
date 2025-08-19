@@ -34,8 +34,8 @@ export class WasmEngine {
         return { aggregate_height: -0.3, max_height: -0.12, bumpiness: -0.12, holes: -0.28, completed_lines: 0.5 };
       case 'Defensive':
         return { aggregate_height: -0.8, max_height: -0.9, bumpiness: -0.5, holes: -0.6, completed_lines: 1.2 };
-      case 'TSpan':
-        return { aggregate_height: -0.45, max_height: -0.6, bumpiness: -0.25, holes: -0.5, completed_lines: 0.9 };
+      case '9-0':
+        return { aggregate_height: -0.55, max_height: -0.25, bumpiness: -0.15, holes: -0.85, completed_lines: 0.9 };
       case 'Balanced':
       default:
         return { aggregate_height: -0.51, max_height: -0.18, bumpiness: -0.18, holes: -0.36, completed_lines: 0.76 };
@@ -464,6 +464,13 @@ export class WasmEngine {
     console.log(startMsg);
     this.currentMoveLogs.push(startMsg);
 
+    // Estimate engine key presses for this sequence and count them once (ARR=0 treats holds as 1 press)
+    const plannedKeypresses = this.countEngineKeyPressesForMoves(moves);
+    if (plannedKeypresses > 0) {
+      this.gameScene.gameState.engineKeyPresses += plannedKeypresses;
+      this.gameScene.gameState.totalKeyPresses += plannedKeypresses;
+    }
+
     // Capture initial state
     const initialPiece = this.gameScene.gameState.currentTetromino;
     const initialBlocks = this.verboseDebug ? this.calculateBlockPositions(initialPiece) : [];
@@ -648,6 +655,39 @@ export class WasmEngine {
     step();
   }
 
+  private countEngineKeyPressesForMoves(moves: string[]): number {
+    let count = 0;
+    let holdDir: 'left' | 'right' | null = null;
+    let usedSoftDrop = false;
+    for (const m of moves) {
+      switch (m) {
+        case 'move_left':
+        case 'move_to_left':
+          if (holdDir !== 'left') { count++; holdDir = 'left'; }
+          break;
+        case 'move_right':
+        case 'move_to_right':
+          if (holdDir !== 'right') { count++; holdDir = 'right'; }
+          break;
+        case 'rotate':
+        case 'rotate_ccw':
+        case 'rotate_180':
+          count++;
+          break;
+        case 'soft_drop':
+          if (!usedSoftDrop) { count++; usedSoftDrop = true; }
+          break;
+        case 'hard_drop':
+        case 'hold':
+          count++;
+          break;
+        default:
+          break;
+      }
+    }
+    return count;
+  }
+
   private logActualPlacement(): void {
     const hdr = "📍 ACTUAL FINAL BOARD STATE:";
     console.log(hdr);
@@ -781,11 +821,17 @@ export class WasmEngine {
       this.executeFullSequence(sequence);
     } else {
       // Single move fallback
+      const plannedKeypresses = this.countEngineKeyPressesForMoves([sequence]);
+      if (plannedKeypresses > 0) {
+        this.gameScene.gameState.engineKeyPresses += plannedKeypresses;
+        this.gameScene.gameState.totalKeyPresses += plannedKeypresses;
+      }
       this.executeMove(sequence);
     }
   }
 
   private executeMove(move: string): void {
+    // Do not count here; counts are added once per planned sequence (or single move fallback)
     const beforeState = this.gameScene.gameState.currentTetromino;
     const canManipulate = this.gameScene.gameState.canManipulatePiece;
     const gameOver = this.gameScene.gameState.gameOver;

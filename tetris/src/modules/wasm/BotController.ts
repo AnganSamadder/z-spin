@@ -24,43 +24,53 @@ export class LocalGameController implements BotController {
   }
 
   moveLeft(): void {
+    this.scene.gameState.totalKeyPresses++;
     this.scene.gameLogic.moveBlockLeft();
   }
 
   moveRight(): void {
+    this.scene.gameState.totalKeyPresses++;
     this.scene.gameLogic.moveBlockRight();
   }
 
   moveToLeft(): void {
+    this.scene.gameState.totalKeyPresses++;
     this.scene.gameLogic.moveAllTheWayLeft();
   }
 
   moveToRight(): void {
+    this.scene.gameState.totalKeyPresses++;
     this.scene.gameLogic.moveAllTheWayRight();
   }
 
   rotateCW(): void {
+    this.scene.gameState.totalKeyPresses++;
     this.scene.gameLogic.rotate('clockwise');
   }
 
   rotateCCW(): void {
+    this.scene.gameState.totalKeyPresses++;
     this.scene.gameLogic.rotate('counter-clockwise');
   }
 
   rotate180(): void {
+    this.scene.gameState.totalKeyPresses++;
     this.scene.gameLogic.rotate('180');
   }
 
   // Soft drop mirrors a held soft-drop key with SDF set to drop-to-bottom (our default)
   softDrop(): void {
+    this.scene.gameState.totalKeyPresses++;
     this.scene.gameLogic.moveToBottom();
   }
 
   moveDown(): void {
+    this.scene.gameState.totalKeyPresses++;
     this.scene.gameLogic.moveBlockDown(true);
   }
 
   hardDrop(): { clearedLines: number, gameOver: boolean, displayInfo?: { clearType: string, b2bCount: number, comboCount: number } } {
+    this.scene.gameState.totalKeyPresses++;
     // capture BEFORE 20x10 once per piece
     if (!this.lastBeforeBoard) {
       const b = this.scene.gameState.board.slice(-20);
@@ -165,6 +175,7 @@ export class LocalGameController implements BotController {
   }
 
   hold(): void {
+    this.scene.gameState.totalKeyPresses++;
     this.scene.gameLogic.performHold();
   }
 }

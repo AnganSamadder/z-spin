@@ -22,6 +22,13 @@ export class GameState {
     public lastKickOffset: { x: number, y: number } | null = null;
     public isWasmMode: boolean = false; // Track if we're using WASM mode
     public isSoftDropping: boolean = false;
+    // Live metrics for UI
+    public totalKeyPresses: number = 0; // legacy aggregate; prefer humanKeyPresses + engineKeyPresses
+    public humanKeyPresses: number = 0;
+    public engineKeyPresses: number = 0;
+    public totalPiecesPlaced: number = 0;
+    public totalLinesCleared: number = 0;
+    public gameStartTimestampMs: number = 0;
 
     constructor() {
         this.reset();
@@ -110,6 +117,12 @@ export class GameState {
         this.nextTetrominoQueue = [];
         this.isWasmMode = false;
         this.isSoftDropping = false;
+        this.totalKeyPresses = 0;
+        this.humanKeyPresses = 0;
+        this.engineKeyPresses = 0;
+        this.totalPiecesPlaced = 0;
+        this.totalLinesCleared = 0;
+        this.gameStartTimestampMs = Date.now();
         this.fillCurrentBag();
     }
 }

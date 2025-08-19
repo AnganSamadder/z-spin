@@ -129,6 +129,8 @@ export class InputHandler {
                 for (const keyObj of this.actionKeyObjects[action]) {
                     if (keyObj && Phaser.Input.Keyboard.JustDown(keyObj)) {
                         actionTriggered = true;
+                        this.scene.gameState.totalKeyPresses++;
+                        this.scene.gameState.humanKeyPresses++;
                         break;
                     }
                 }
@@ -143,6 +145,14 @@ export class InputHandler {
                 }
             }
         }
+
+        const leftJustDown = this.actionKeyObjects.moveLeft?.some(k => Phaser.Input.Keyboard.JustDown(k)) ?? false;
+        const rightJustDown = this.actionKeyObjects.moveRight?.some(k => Phaser.Input.Keyboard.JustDown(k)) ?? false;
+        const downJustDown = this.actionKeyObjects.softDrop?.some(k => Phaser.Input.Keyboard.JustDown(k)) ?? false;
+
+        if (leftJustDown) { this.scene.gameState.totalKeyPresses++; this.scene.gameState.humanKeyPresses++; }
+        if (rightJustDown) { this.scene.gameState.totalKeyPresses++; this.scene.gameState.humanKeyPresses++; }
+        if (downJustDown) { this.scene.gameState.totalKeyPresses++; this.scene.gameState.humanKeyPresses++; }
 
         const isLeftPressed = this.actionKeyObjects.moveLeft?.some(k => k.isDown) ?? false;
         const isRightPressed = this.actionKeyObjects.moveRight?.some(k => k.isDown) ?? false;

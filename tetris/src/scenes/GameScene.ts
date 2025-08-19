@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 // SettingsScene imported in game.ts; not directly referenced here
-import { GameSettings, DEFAULT_SETTINGS } from '../types';
+import { GameSettings, DEFAULT_SETTINGS, Strategy } from '../types';
 import { GameState } from '../modules/state/GameState';
 import { InputHandler } from '../modules/input/InputHandler';
 import { GameRenderer } from '../modules/rendering/GameRenderer';
@@ -330,43 +330,70 @@ export class GameScene extends Phaser.Scene {
         container.style.display = 'flex';
         container.style.flexDirection = 'column';
         container.style.justifyContent = 'center';
-        container.style.alignItems = 'center';
-        container.style.gap = '20px';
+        container.style.alignItems = 'stretch';
+        container.style.gap = '12px';
+        container.style.width = '100%';
+        container.style.maxWidth = '100%';
+        container.style.boxSizing = 'border-box';
 
-        const title = document.createElement('div');
-        title.textContent = 'Simple Debug Mode';
-        title.style.fontWeight = 'bold';
-        title.style.fontSize = '18px';
-        title.style.marginBottom = '20px';
-        container.appendChild(title);
+        // Remove duplicate controls here; they already exist at the top bar.
 
-        const playEngineBtn = document.createElement('button');
-        playEngineBtn.textContent = this.isWasmActive ? 'Stop WASM Engine' : 'Play WASM Engine';
-        playEngineBtn.style.padding = '12px 24px';
-        playEngineBtn.style.fontSize = '16px';
-        playEngineBtn.style.cursor = 'pointer';
-        playEngineBtn.style.backgroundColor = '#333';
-        playEngineBtn.style.color = 'white';
-        playEngineBtn.style.border = '1px solid #555';
-        playEngineBtn.style.borderRadius = '4px';
-        playEngineBtn.addEventListener('click', () => {
-            this.toggleWasmEngine();
-            playEngineBtn.textContent = this.isWasmActive ? 'Stop WASM Engine' : 'Play WASM Engine';
-        });
-        container.appendChild(playEngineBtn);
+        // Strategy selector (simple presets; live-switchable)
+        const strategyWrapper = document.createElement('div');
+        strategyWrapper.style.display = 'flex';
+        strategyWrapper.style.flexDirection = 'column';
+        strategyWrapper.style.alignItems = 'center';
+        strategyWrapper.style.gap = '8px';
 
-        const debugMoveBtn = document.createElement('button');
-        debugMoveBtn.textContent = 'Debug One Move';
-        debugMoveBtn.style.padding = '12px 24px';
-        debugMoveBtn.style.fontSize = '16px';
-        debugMoveBtn.style.cursor = 'pointer';
-        debugMoveBtn.style.backgroundColor = '#333';
-        debugMoveBtn.style.color = 'white';
-        debugMoveBtn.style.border = '1px solid #555';
-        debugMoveBtn.style.borderRadius = '4px';
-        debugMoveBtn.addEventListener('click', () => {
-            this.debugNextMove();
-        });
-        container.appendChild(debugMoveBtn);
+        const strategyTitle = document.createElement('div');
+        strategyTitle.textContent = 'Strategy';
+        strategyTitle.style.fontWeight = 'bold';
+        strategyTitle.style.fontSize = '16px';
+        strategyWrapper.appendChild(strategyTitle);
+
+        const buttonsRow = document.createElement('div');
+        buttonsRow.style.display = 'flex';
+        buttonsRow.style.flexWrap = 'wrap';
+        buttonsRow.style.gap = '8px';
+        buttonsRow.style.justifyContent = 'center';
+        buttonsRow.style.maxWidth = '100%';
+
+        const strategies: Strategy[] = [
+            Strategy.Balanced,
+            Strategy.Aggressive,
+            Strategy.Defensive,
+            Strategy.NineZero,
+        ];
+
+        const currentSettings: GameSettings = this.registry.get('gameSettings') || { ...DEFAULT_SETTINGS };
+        const current = currentSettings.aiStrategy;
+
+        for (const s of strategies) {
+            const btn = document.createElement('button');
+            btn.textContent = (s === Strategy.NineZero ? '9-0' : s);
+            btn.style.padding = '8px 14px';
+            btn.style.fontSize = '14px';
+            btn.style.cursor = 'pointer';
+            btn.style.borderRadius = '16px';
+            btn.style.border = '1px solid #555';
+            btn.style.whiteSpace = 'nowrap';
+            btn.style.flex = '0 1 auto';
+            // Highlight selected strategy
+            const isSelected = s === current;
+            btn.style.backgroundColor = isSelected ? '#0a84ff' : '#333';
+            btn.style.color = isSelected ? '#fff' : '#ddd';
+
+            btn.addEventListener('click', () => {
+                const settings: GameSettings = this.registry.get('gameSettings') || { ...DEFAULT_SETTINGS };
+                settings.aiStrategy = s;
+                this.registry.set('gameSettings', settings);
+                // Re-render simple UI to reflect new selection immediately
+                this.createSimpleDebugUI(container);
+            });
+            buttonsRow.appendChild(btn);
+        }
+
+        strategyWrapper.appendChild(buttonsRow);
+        container.appendChild(strategyWrapper);
     }
 }

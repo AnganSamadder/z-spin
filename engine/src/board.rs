@@ -154,6 +154,11 @@ impl Board {
         let mut holes = 0.0;
         let total_height = heights.iter().sum::<usize>() as f64;
         let max_height = *heights.iter().max().unwrap_or(&0) as f64;
+        // Right-well helpers
+        let right_well_height = heights[BOARD_WIDTH - 1] as f64; // column 9
+        let left_9_max_height = (*heights[0..BOARD_WIDTH - 1].iter().max().unwrap_or(&0)) as f64;
+        let mut right_well_fill_rows = 0.0; // number of visible cells filled in col 9
+        let mut tetris_ready_rows = 0.0;    // rows where cols 0..8 are full and col 9 is empty
 
         // More efficient hole counting: an empty cell with a block above it.
         for x in 0..BOARD_WIDTH {
@@ -172,6 +177,18 @@ impl Board {
             bumpiness += (heights[i] as f64 - heights[i + 1] as f64).abs();
         }
 
+        // Compute helper features using only visible area
+        let start_row = BOARD_HEIGHT - VISIBLE_HEIGHT;
+        for y in start_row..BOARD_HEIGHT {
+            let filled_left_9 = (0..BOARD_WIDTH - 1).all(|x| self.get_cell(x, y));
+            let right_well_filled = self.get_cell(BOARD_WIDTH - 1, y);
+            if right_well_filled { right_well_fill_rows += 1.0; }
+            if filled_left_9 && !right_well_filled { tetris_ready_rows += 1.0; }
+        }
+
+        // Attach auxiliary metrics into bumpiness using a compact encoding is not ideal;
+        // instead the evaluation function will ask for these via a dedicated API. For now,
+        // we return the standard metrics; auxiliary values can be recomputed where needed.
         (total_height, max_height, holes, bumpiness)
     }
 

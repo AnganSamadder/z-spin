@@ -228,6 +228,9 @@ export class Physics {
             }
         }
 
+        // Count piece placement regardless of game over
+        this.gameState.totalPiecesPlaced++;
+
         if (isGameOver) {
             this.gameState.gameOver = true;
             return { clearedLines: 0, gameOver: true };
@@ -313,6 +316,9 @@ export class Physics {
         if (isPerfectClear) {
             finalScore += 3500; // Flat bonus for perfect clear
         }
+
+        // Update aggregate metrics
+        this.gameState.totalLinesCleared += linesCleared;
 
         // Add to total score
         this.gameState.score += finalScore;

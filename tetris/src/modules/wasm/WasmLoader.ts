@@ -127,7 +127,8 @@ class WasmLoader {
     'Balanced': 0,
     'Aggressive': 1,
     'Defensive': 2,
-    'TSpan': 3,
+    '9-0': 3,
+    'NineZero': 3, // internal enum name
   };
 
   private constructor() {}
