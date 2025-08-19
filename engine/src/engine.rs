@@ -62,9 +62,7 @@ impl TetrisEngine {
         let piece_type = PieceType::from_i32(current_piece).unwrap_or(PieceType::I);
         let next_piece_type = PieceType::from_i32(next_piece);
 
-        // Generate new move sequence
-        // TODO: Get actual current piece position from JavaScript interface
-        // For now, using spawn position as default
+        // Generate new move sequence from spawn position
         let current_x = 4; // Default spawn x position
         let current_y = 0; // Default spawn y position  
         let current_rotation = 0; // Default spawn rotation
@@ -100,8 +98,7 @@ impl TetrisEngine {
         let piece_type = PieceType::from_i32(current_piece_idx).unwrap_or(PieceType::I);
         let next_piece_type = PieceType::from_i32(next_piece_idx);
 
-        // TODO: Get actual current piece position from JavaScript interface
-        // For now, using spawn position as default
+        // Generate new move sequence from spawn position
         let current_x = 4; // Default spawn x position
         let current_y = 0; // Default spawn y position  
         let current_rotation = 0; // Default spawn rotation

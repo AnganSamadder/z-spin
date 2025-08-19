@@ -1,4 +1,4 @@
-import { TETROMINOES, TETROMINO_KEYS, BOARD_WIDTH_BLOCKS, LOGICAL_BOARD_HEIGHT_BLOCKS, BUFFER_ZONE_HEIGHT } from '../../constants';
+import { TETROMINOES, TETROMINO_KEYS, BOARD_WIDTH_BLOCKS, LOGICAL_BOARD_HEIGHT_BLOCKS } from '../../constants';
 import { TetrominoState, HeldTetrominoState } from '../../types';
 
 export class GameState {

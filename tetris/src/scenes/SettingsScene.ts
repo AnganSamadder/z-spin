@@ -203,7 +203,7 @@ export class SettingsScene extends Phaser.Scene {
         // Update tab button highlights
         const children = this.children.list;
         let gameplayBtn, controlsBtn, audioVisualBtn;
-        for (let child of children) {
+        for (const child of children) {
             if (child instanceof Phaser.GameObjects.Text) {
                 if (child.text === 'Gameplay') gameplayBtn = child as Phaser.GameObjects.Text;
                 else if (child.text === 'Controls') controlsBtn = child as Phaser.GameObjects.Text;
@@ -457,7 +457,7 @@ export class SettingsScene extends Phaser.Scene {
 
             if (!fromDrag) { // Only update thumb position if not called from thumb drag itself
                 let percent = 0;
-                let valueForPercentCalculation = newValue;
+                const valueForPercentCalculation = newValue;
 
                 if (isInfinityAllowed && valueForPercentCalculation === infinityValueRepresentation) {
                     percent = 1; // Position thumb at max for INF
@@ -494,7 +494,7 @@ export class SettingsScene extends Phaser.Scene {
         updateThumbAndValue(initialSliderDisplayValue);
 
 
-        thumbInteractive.on('drag', (pointer: Phaser.Input.Pointer, dragX: number, dragY: number) => {
+        thumbInteractive.on('drag', (_pointer: Phaser.Input.Pointer, dragX: number, _dragY: number) => {
             let newThumbX = dragX;
             const trackStartX = labelObj.x + 180; // Use label's current x + offset
             const trackEndX = trackStartX + sliderWidth - thumbWidth;
@@ -595,7 +595,7 @@ export class SettingsScene extends Phaser.Scene {
         return [labelObj, keyDisplay1, setButton1, keyDisplay2, setButton2];
     }
 
-    private captureKeyForAction(actionKey: keyof GameSettings['keybinds'], keyIndex: number, activeDisplay: Phaser.GameObjects.Text, otherDisplay: Phaser.GameObjects.Text): void {
+    private captureKeyForAction(actionKey: keyof GameSettings['keybinds'], keyIndex: number, activeDisplay: Phaser.GameObjects.Text, _otherDisplay: Phaser.GameObjects.Text): void {
         activeDisplay.setText('Press key...').setColor('#ff9900');
 
         if (this.input.keyboard) { // Check if keyboard manager is available

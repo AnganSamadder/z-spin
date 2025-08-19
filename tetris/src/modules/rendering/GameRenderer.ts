@@ -76,7 +76,7 @@ export class GameRenderer {
     public showComboText(clearType: string, b2bCount: number, comboCount: number): void {
         if (clearType) {
             // Intelligent text wrapping based on available space
-            let displayText = this.wrapTextIntelligently(clearType, HOLD_AREA_WIDTH - 20); // 20px padding
+            const displayText = this.wrapTextIntelligently(clearType, HOLD_AREA_WIDTH - 20); // 20px padding
 
             this.comboText.setText(displayText).setVisible(true);
         } else {

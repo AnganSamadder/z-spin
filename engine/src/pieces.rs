@@ -320,7 +320,7 @@ static PIECE_MASKS: Lazy<PieceMasks> = Lazy::new(|| {
 
                 // VALIDATE ALL BLOCKS ARE WITHIN BOARD BOUNDS BEFORE CREATING MASK
                 let mut all_blocks_valid = true;
-                for &(grid_col, grid_row) in blocks {
+                for &(grid_col, _grid_row) in blocks {
                     let rel_x = grid_col as i32 - pivot_col;
                     let board_x = x_offset + rel_x;
                     
@@ -378,9 +378,6 @@ pub struct Placement {
 }
 
 impl Placement {
-    pub fn new(x: i32, y: i32, rotation: usize) -> Self {
-        Self { x, y, rotation }
-    }
 }
 
 impl Default for Placement {

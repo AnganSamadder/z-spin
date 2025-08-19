@@ -3,14 +3,7 @@ import { GameState } from '../state/GameState';
 import { GameRenderer } from '../rendering/GameRenderer';
 import { GameSettings, DEFAULT_SETTINGS } from '../../types';
 import { Physics } from './Physics';
-import {
-    BOARD_WIDTH_BLOCKS,
-    LOGICAL_BOARD_HEIGHT_BLOCKS,
-    BUFFER_ZONE_HEIGHT,
-    KICK_DATA_JLSTZ,
-    KICK_DATA_I,
-    TETROMINOES,
-} from '../../constants';
+// No direct constant usage here; physics uses constants internally
 
 export class GameLogic {
     private scene: GameScene;

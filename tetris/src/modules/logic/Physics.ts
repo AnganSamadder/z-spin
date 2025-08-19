@@ -7,7 +7,7 @@ import {
     KICK_DATA_I,
     BUFFER_ZONE_HEIGHT
 } from '../../constants';
-import { TetrominoState, HeldTetrominoState } from '../../types';
+// Types imported elsewhere as needed
 
 export class Physics {
     private gameState: GameState;
@@ -272,12 +272,12 @@ export class Physics {
         }
     }
 
-    private updateScoringAndGetDisplayInfo(linesCleared: number, spinInfo?: { isSpin: boolean, pieceType: string }, shouldCheckForSpin?: boolean): { clearedLines: number, displayInfo: { clearType: string, b2bCount: number, comboCount: number } } {
+    private updateScoringAndGetDisplayInfo(linesCleared: number, spinInfo?: { isSpin: boolean, pieceType: string }, _shouldCheckForSpin?: boolean): { clearedLines: number, displayInfo: { clearType: string, b2bCount: number, comboCount: number } } {
         // Check if it's a perfect clear (board is completely empty after line clear)
         const isPerfectClear = this.isEmptyBoard();
 
         // Determine line clear type and if it's "difficult" (maintains B2B)
-        const { clearType, isDifficultClear, baseScore } = this.getClearTypeAndScore(linesCleared, isPerfectClear, spinInfo, shouldCheckForSpin);
+        const { clearType, isDifficultClear, baseScore } = this.getClearTypeAndScore(linesCleared, isPerfectClear, spinInfo, _shouldCheckForSpin);
 
         // Update combo count
         this.gameState.comboCount++;
@@ -340,7 +340,7 @@ export class Physics {
         return true;
     }
 
-    private getClearTypeAndScore(linesCleared: number, isPerfectClear: boolean, spinInfo?: { isSpin: boolean, pieceType: string }, shouldCheckForSpin?: boolean): { clearType: string, isDifficultClear: boolean, baseScore: number } {
+    private getClearTypeAndScore(linesCleared: number, isPerfectClear: boolean, spinInfo?: { isSpin: boolean, pieceType: string }, _shouldCheckForSpin?: boolean): { clearType: string, isDifficultClear: boolean, baseScore: number } {
         let clearType = '';
         let isDifficultClear = false;
         let baseScore = 0;

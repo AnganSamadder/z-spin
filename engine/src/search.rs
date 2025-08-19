@@ -7,7 +7,6 @@ use std::collections::{HashSet, VecDeque};
 #[derive(Clone, Debug, Default)]
 pub struct SearchResult {
     pub best_move: String,
-    pub best_score: f64,
 }
 
 #[derive(Clone, Debug)]
@@ -29,7 +28,6 @@ impl SearchEngine {
 
         // Consider hold option if available
         let mut final_sequence = seq_curr.clone();
-        let mut final_score = score_curr;
 
         if can_hold {
             if let Some(hold_type) = held_piece {
@@ -38,8 +36,7 @@ impl SearchEngine {
                 let (seq_hold, _placement_hold, mut score_hold) = self.find_best_move_for_strategy(board, hold_type, spawn.x, spawn.y, spawn.rotation, &weights, arr, das, debug);
                 // Apply small penalty for using hold to break ties against switching
                 score_hold -= 0.5;
-                if score_hold > final_score {
-                    final_score = score_hold;
+                if score_hold > score_curr {
                     final_sequence = if seq_hold.is_empty() { "hold".to_string() } else { format!("hold,{}", seq_hold) };
                 }
             } else {
@@ -49,15 +46,14 @@ impl SearchEngine {
                     let spawn = Piece::spawn(next_type);
                     let (seq_hold, _placement_hold, mut score_hold) = self.find_best_move_for_strategy(board, next_type, spawn.x, spawn.y, spawn.rotation, &weights, arr, das, debug);
                     score_hold -= 0.5;
-                    if score_hold > final_score {
-                        final_score = score_hold;
+                    if score_hold > score_curr {
                         final_sequence = if seq_hold.is_empty() { "hold".to_string() } else { format!("hold,{}", seq_hold) };
                     }
                 }
             }
         }
 
-        SearchResult { best_move: final_sequence, best_score: final_score }
+        SearchResult { best_move: final_sequence }
     }
 
     fn find_best_move_for_strategy(&self, board: &Board, current_piece: PieceType, current_x: i32, current_y: i32, current_rotation: usize, weights: &EvaluationWeights, arr: u32, das: u32, debug: bool) -> (String, Placement, f64) {
@@ -167,7 +163,7 @@ impl SearchEngine {
             target_visual_board.display_board("🎯 TARGET PLACEMENT (where AI wants to place)", None);
 
             // 🔍 EVALUATION BREAKDOWN for top candidates (terms and weighted sum)
-            let mut explain = |placement: &Placement| {
+            let explain = |placement: &Placement| {
                 let mut piece = Piece::new(current_piece, placement.x, placement.y).with_rotation(placement.rotation);
                 let mut board_after = board.clone();
                 while board_after.can_place_piece(&piece.moved(0, 1)) { piece = piece.moved(0, 1); }
@@ -801,7 +797,7 @@ impl SearchEngine {
             // Kick-aware rotation moves with heuristic costs relative to target
             let target_x = placement.x;
             let target_rot = placement.rotation;
-            let mut rot_cost_for = |from: &Piece, to: &Piece| -> usize {
+            let rot_cost_for = |from: &Piece, to: &Piece| -> usize {
                 let dy = (to.y - from.y).max(0) as isize; // downward kick cells
                 let dx = (to.x - from.x).abs() as isize;   // lateral kick cells
                 let base = 1isize; // one rotate key

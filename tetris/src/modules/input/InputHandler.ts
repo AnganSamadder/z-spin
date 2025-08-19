@@ -116,6 +116,11 @@ export class InputHandler {
         const isDownPressed = this.actionKeyObjects.softDrop?.some(k => k.isDown) ?? false;
         this.scene.gameState.isSoftDropping = isDownPressed;
 
+        // Disable manual input while AI is playing a sequence for visibility to avoid desync
+        const isAiPlayingSequence = (this.scene as any).wasmEngine && (this.scene as any).wasmEngine.isPlayingSequence === true;
+        if (isAiPlayingSequence) {
+            return;
+        }
         if (this.scene.gameState.gameOver || !this.scene.gameState.canManipulatePiece || !this.scene.gameState.currentTetromino || !this.input?.keyboard) return;
 
         for (const action of this.singlePressActions) {
@@ -139,8 +144,8 @@ export class InputHandler {
             }
         }
 
-        let isLeftPressed = this.actionKeyObjects.moveLeft?.some(k => k.isDown) ?? false;
-        let isRightPressed = this.actionKeyObjects.moveRight?.some(k => k.isDown) ?? false;
+        const isLeftPressed = this.actionKeyObjects.moveLeft?.some(k => k.isDown) ?? false;
+        const isRightPressed = this.actionKeyObjects.moveRight?.some(k => k.isDown) ?? false;
 
         if (isDownPressed) {
             if (this.sdf === Infinity) {

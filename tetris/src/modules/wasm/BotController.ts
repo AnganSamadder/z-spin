@@ -94,7 +94,7 @@ export class LocalGameController implements BotController {
           for (let x = 0; x < 9; x++) bumpiness += Math.abs(h[x] - h[x+1]);
           return { totalHeight, maxHeight, holes, bumpiness };
         };
-        const beforeM = computeMetrics(this.lastBeforeBoard || after);
+        const _beforeM = computeMetrics(this.lastBeforeBoard || after);
         const afterM = computeMetrics(after);
         // Estimate completed lines by counting filled rows difference
         const countFull = (g:number[][])=>g.reduce((acc, row)=>acc + (row.every(c=>c===1)?1:0), 0);
@@ -125,11 +125,19 @@ export class LocalGameController implements BotController {
         const diffAscii = toAsciiDiff(after, this.lastBeforeBoard || after);
 
         const logLines: string[] = (wasm.currentMoveLogs || []).slice();
+        // Insert target block between BEFORE and DIFF if available
+        const target = (wasm.expectedFinalPosition || null);
+        if (target) {
+          logLines.push(`🎯 TARGET (from engine): (${target.x}, ${target.y}) r${target.rotation}`);
+        }
         logLines.push(`🧠 Weights: ah=${weights.aggregate_height.toFixed(2)}, mh=${weights.max_height.toFixed(2)}, bp=${weights.bumpiness.toFixed(2)}, ho=${weights.holes.toFixed(2)}, ln=${weights.completed_lines.toFixed(2)}`);
         logLines.push(`🧮 Intuition terms: aggH=${afterM.totalHeight.toFixed(1)} → ${(afterM.totalHeight*weights.aggregate_height).toFixed(2)}, maxH=${afterM.maxHeight.toFixed(1)} → ${(afterM.maxHeight*weights.max_height).toFixed(2)}, bump=${afterM.bumpiness.toFixed(1)} → ${(afterM.bumpiness*weights.bumpiness).toFixed(2)}, holes=${afterM.holes.toFixed(1)} → ${(afterM.holes*weights.holes).toFixed(2)}, lines=${completedLines} → ${(completedLines*weights.completed_lines).toFixed(2)}`);
         logLines.push(`🧹 Lines cleared this move: ${completedLines}`);
         logLines.push('📋 BEFORE BOARD STATE (for copy)');
         for (const line of beforeAscii) logLines.push(line);
+        if (target) {
+          logLines.push(`🎯 TARGET POSE: (${target.x}, ${target.y}) r${target.rotation}`);
+        }
         logLines.push('📋 NEW PIECE DIFF (▓ = new, █ = existing)');
         for (const line of diffAscii) logLines.push(line);
         const rec = {
@@ -145,10 +153,13 @@ export class LocalGameController implements BotController {
           intuition,
           rawLogs: logLines.join('\n'),
           timestamp: Date.now(),
+          visibleOffsetY: 20 - (this.lastBeforeBoard || after).length,
         } as any;
         (this.scene as any).debugPanel.pushRecord(rec);
       }
-    } catch (_) {}
+    } catch (_) {
+      // no-op
+    }
     this.lastBeforeBoard = null;
     return safeResult;
   }

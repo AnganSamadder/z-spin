@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { SettingsScene } from './SettingsScene';
+// SettingsScene imported in game.ts; not directly referenced here
 import { GameSettings, DEFAULT_SETTINGS } from '../types';
 import { GameState } from '../modules/state/GameState';
 import { InputHandler } from '../modules/input/InputHandler';
@@ -8,6 +8,8 @@ import { DebugPanel } from '../modules/rendering/DebugPanel';
 import { GameLogic } from '../modules/logic/GameLogic';
 import { WasmEngine } from '../modules/wasm/WasmEngine';
 import WasmLoader from '../modules/wasm/WasmLoader';
+import Logger from '../modules/utils/Logger';
+import { DEFAULT_LOG_LEVEL, ALLOW_CONSOLE_LOGS_IN_DEBUG } from '../config';
 import {
     BLOCK_SIZE,
 } from '../constants';
@@ -25,7 +27,8 @@ export class GameScene extends Phaser.Scene {
     private wasmToggleButton: HTMLButtonElement | null = null;
     private wasmDebugButton: HTMLButtonElement | null = null;
     private debugModeButton: HTMLButtonElement | null = null;
-    private isDebugModeOn: boolean = true;
+    private isDebugModeOn: boolean = false;
+    private suspendLockDelay: boolean = false;
 
     private lockDelayTimer: Phaser.Time.TimerEvent | null = null;
     private lockDelayDuration: number = 500;
@@ -38,6 +41,8 @@ export class GameScene extends Phaser.Scene {
     preload(): void {}
 
     create(): void {
+        // Apply code-level default log level on startup
+        Logger.applyConsoleLevel(DEFAULT_LOG_LEVEL);
         if (!this.registry.has('gameSettings')) {
             this.registry.set('gameSettings', { ...DEFAULT_SETTINGS });
         }
@@ -144,6 +149,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     public startLockDelayTimer(): void {
+        if (this.suspendLockDelay) {
+            return;
+        }
         // Check if we've exceeded the maximum lock resets - if so, lock immediately
         if (this.gameState.lockResetsCount >= this.gameState.maxLockResets) {
             console.log(`Max lock resets (${this.gameState.maxLockResets}) reached, locking immediately`);
@@ -166,6 +174,11 @@ export class GameScene extends Phaser.Scene {
     }
 
     private onLockDelayEnd(): void {
+        if (this.suspendLockDelay) {
+            // Ignore lock while suspended
+            this.lockDelayTimer = null;
+            return;
+        }
         this.lockDelayTimer = null;
         if (this.gameState.currentTetromino && this.gameState.isPieceLanded) {
             // Double-check the piece is still colliding downward (landed)
@@ -181,6 +194,25 @@ export class GameScene extends Phaser.Scene {
 
     public endFallTimer(): void {
         if (this.fallTimer) this.fallTimer.remove();
+    }
+
+    public isGravityPaused(): boolean {
+        return !!(this.fallTimer && this.fallTimer.paused);
+    }
+
+    public pauseGravity(): void {
+        if (this.fallTimer) this.fallTimer.paused = true;
+    }
+
+    public resumeGravity(): void {
+        if (this.fallTimer) this.fallTimer.paused = false;
+    }
+
+    public setLockDelaySuspended(suspend: boolean): void {
+        this.suspendLockDelay = suspend;
+        if (suspend) {
+            this.cancelLockDelayTimer();
+        }
     }
 
     private setupWasmToggleButton(): void {
@@ -267,6 +299,12 @@ export class GameScene extends Phaser.Scene {
 
     private toggleDebugMode(): void {
         this.isDebugModeOn = !this.isDebugModeOn;
+        // Toggle console verbosity with debug mode
+        if (this.isDebugModeOn && ALLOW_CONSOLE_LOGS_IN_DEBUG) {
+            Logger.applyConsoleLevel('debug');
+        } else {
+            Logger.applyConsoleLevel(DEFAULT_LOG_LEVEL);
+        }
         this.updateDebugModeUI();
     }
 

@@ -9,8 +9,7 @@ mod engine;
 
 use engine::TetrisEngine;
 use crate::evaluation::Strategy;
-use crate::board::Board;
-use crate::pieces::{PieceType, Piece};
+// Prune unused imports
 
 // Console.log for debugging
 #[wasm_bindgen]
@@ -88,7 +87,7 @@ impl WasmTetrisEngine {
         };
         
         // Convert next piece
-        let next_piece_type = crate::pieces::PieceType::from_i32(next_piece).unwrap_or(crate::pieces::PieceType::T);
+        // next_piece_type intentionally unused here
         
         // Run the search using the engine's method with corrected coordinates
         self.engine.get_best_move_with_position(&board, current_piece, final_coordinates.0, final_coordinates.1, current_rotation as usize, next_piece, strategy)

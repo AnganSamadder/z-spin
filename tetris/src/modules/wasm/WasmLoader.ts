@@ -12,9 +12,9 @@ export interface WasmTetrisEngine {
   rotate(): boolean;
   spawn_tetromino(typeKey: number): boolean;
   get_game_state_json(): string;
-  get_best_move(board: number[], current_piece: number, next_piece: number): string;
-  getBestMoveWithPosition(board: number[], current_piece: number, current_x: number, current_y: number, current_rotation: number, next_piece: number, strategy: number): string;
-  getFullMoveSequenceWithPosition(board: number[], current_piece: number, current_x: number, current_y: number, current_rotation: number, next_piece: number, strategy: number): string;
+  get_best_move(_board: number[], _current_piece: number, _next_piece: number): string;
+  getBestMoveWithPosition(_board: number[], _current_piece: number, _current_x: number, _current_y: number, _current_rotation: number, _next_piece: number, _strategy: number): string;
+  getFullMoveSequenceWithPosition(_board: number[], _current_piece: number, _current_x: number, _current_y: number, _current_rotation: number, _next_piece: number, _strategy: number): string;
 }
 
 // Fallback implementation when WASM isn't available
@@ -73,7 +73,7 @@ class WasmTetrisEngineWrapper implements WasmTetrisEngine {
     return true;
   }
 
-  spawn_tetromino(typeKey: number): boolean {
+  spawn_tetromino(_typeKey: number): boolean {
     return true;
   }
 
@@ -85,7 +85,7 @@ class WasmTetrisEngineWrapper implements WasmTetrisEngine {
     return JSON.stringify(state);
   }
 
-  get_best_move(board: number[], current_piece: number, next_piece: number): string {
+  get_best_move(_board: number[], _current_piece: number, _next_piece: number): string {
     if (this.moveIndex < this.moveQueue.length) {
       const move = this.moveQueue[this.moveIndex];
       this.moveIndex++;
@@ -94,12 +94,12 @@ class WasmTetrisEngineWrapper implements WasmTetrisEngine {
     return ''; // Return empty string for no-op
   }
 
-  getBestMoveWithPosition(board: number[], current_piece: number, current_x: number, current_y: number, current_rotation: number, next_piece: number, strategy: number): string {
+  getBestMoveWithPosition(_board: number[], _current_piece: number, _current_x: number, _current_y: number, _current_rotation: number, _next_piece: number, _strategy: number): string {
     // Implementation needed
     throw new Error("Method not implemented");
   }
 
-  getFullMoveSequenceWithPosition(board: number[], current_piece: number, current_x: number, current_y: number, current_rotation: number, next_piece: number, strategy: number): string {
+  getFullMoveSequenceWithPosition(_board: number[], _current_piece: number, _current_x: number, _current_y: number, _current_rotation: number, _next_piece: number, _strategy: number): string {
     // Implementation needed
     throw new Error("Method not implemented");
   }
@@ -186,20 +186,14 @@ class WasmLoader {
       // Clean up the blob URL
       URL.revokeObjectURL(blobUrl);
 
-      this.log('Module imported', {
-        keys: Object.keys(wasmModule),
-        hasDefault: !!wasmModule.default
-      });
+      this.log('Module imported');
 
-      // Initialize the WASM module
+      // Initialize the WASM module (use object form to avoid deprecation warning)
       this.log('Initializing WASM module');
-      this.wasmInitPromise = wasmModule.default('/wasm/z_spin_engine_bg.wasm');
-      const initialized = await this.wasmInitPromise;
+      this.wasmInitPromise = wasmModule.default({ module_or_path: '/wasm/z_spin_engine_bg.wasm' });
+      const _initialized = await this.wasmInitPromise;
 
-      this.log('WASM module initialized', {
-        memory: !!initialized?.memory,
-        exports: !!initialized?.__wbindgen_start
-      });
+      this.log('WASM module initialized');
 
       // Store the module for future use
       this.wasmModule = wasmModule;
@@ -218,9 +212,7 @@ class WasmLoader {
         this.engineClass = WasmTetrisEngineWrapper;
       }
 
-      this.log('WASM module loaded successfully', {
-        engineClass: this.engineClass ? this.engineClass.name || 'Anonymous' : 'None'
-      });
+      this.log('WASM module loaded successfully');
 
       this.isLoading = false;
       return;

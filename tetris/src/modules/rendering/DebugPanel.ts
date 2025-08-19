@@ -1,5 +1,5 @@
 import { GameScene } from '../../scenes/GameScene';
-import { BLOCK_SIZE, BOARD_WIDTH_BLOCKS, VISIBLE_BOARD_HEIGHT_BLOCKS, BUFFER_ZONE_HEIGHT, TETROMINOES } from '../../constants';
+import { BOARD_WIDTH_BLOCKS, VISIBLE_BOARD_HEIGHT_BLOCKS, TETROMINOES } from '../../constants';
 
 export type PlacementRecord = {
   id: string;
@@ -14,6 +14,7 @@ export type PlacementRecord = {
   intuition: string; // brief rationale string
   rawLogs: string;   // concatenated logs snapshot
   timestamp: number;
+  visibleOffsetY?: number; // globalY of beforeBoard[0]
 };
 
 export class DebugPanel {
@@ -131,26 +132,32 @@ export class DebugPanel {
 
     const boards = document.createElement('div');
     boards.style.display = 'grid';
-    boards.style.gridTemplateColumns = '1fr 1fr';
+    boards.style.gridTemplateColumns = '1fr 1fr 1fr';
     boards.style.gap = '8px';
     this.detailRow.appendChild(boards);
 
     const beforeCanvas = this.renderMiniBoard(rec.beforeBoard, 'Before', { mode: 'full', fillColor: '#555' });
     const pieceColorNum = (TETROMINOES as any)[rec.piece]?.color as number | undefined;
     const pieceColor = pieceColorNum !== undefined ? `#${pieceColorNum.toString(16).padStart(6, '0')}` : '#6cf';
+    const targetCanvas = this.renderTargetOverlay(rec.beforeBoard, rec.target, rec.visibleOffsetY, 'Target');
     const afterCanvas = this.renderMiniBoard(rec.afterBoard, 'New piece', { mode: 'diff', diffAgainst: rec.beforeBoard, fillColor: pieceColor });
     boards.appendChild(beforeCanvas);
+    boards.appendChild(targetCanvas);
     boards.appendChild(afterCanvas);
 
     const copyBtn = document.createElement('button');
     copyBtn.textContent = 'Copy logs';
     copyBtn.style.marginTop = '8px';
-    copyBtn.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(rec.rawLogs);
-        copyBtn.textContent = 'Copied!';
-        setTimeout(() => (copyBtn.textContent = 'Copy logs'), 1200);
-      } catch (_) {}
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(rec.rawLogs)
+        .then(() => {
+          copyBtn.textContent = 'Copied!';
+          setTimeout(() => (copyBtn.textContent = 'Copy logs'), 1200);
+        })
+        .catch(() => {
+          copyBtn.textContent = 'Copy failed';
+          setTimeout(() => (copyBtn.textContent = 'Copy logs'), 1200);
+        });
     });
     this.detailRow.appendChild(copyBtn);
 
@@ -213,6 +220,56 @@ export class DebugPanel {
             ctx.fillRect(x * cell, y * cell, cell - 1, cell - 1);
           }
         }
+      }
+    }
+    wrapper.appendChild(canvas);
+    return wrapper;
+  }
+
+  private renderTargetOverlay(board: number[][], target: { x: number; y: number; rotation: number } | null, visibleOffsetY: number | undefined, title: string): HTMLElement {
+    const wrapper = document.createElement('div');
+    const label = document.createElement('div');
+    label.textContent = title;
+    label.style.marginBottom = '4px';
+    wrapper.appendChild(label);
+
+    const cell = 10;
+    const canvas = document.createElement('canvas');
+    canvas.width = BOARD_WIDTH_BLOCKS * cell;
+    canvas.height = VISIBLE_BOARD_HEIGHT_BLOCKS * cell;
+    const ctx = canvas.getContext('2d')!;
+    // Base: faded board
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let y = 0; y < VISIBLE_BOARD_HEIGHT_BLOCKS; y++) {
+      for (let x = 0; x < BOARD_WIDTH_BLOCKS; x++) {
+        ctx.fillStyle = board[y]?.[x] ? '#333' : '#222';
+        ctx.fillRect(x * cell, y * cell, cell - 1, cell - 1);
+      }
+    }
+    if (target) {
+      // Simple crosshair at target.x/target.y; rotation shown as text
+      const visY = typeof visibleOffsetY === 'number' ? (target.y - visibleOffsetY) : target.y;
+      // Clamp to visible range [0, board.length-1]
+      if (visY < 0 || visY >= board.length) {
+        // Out of view; draw only rotation text in corner
+        ctx.fillStyle = '#6cf';
+        ctx.font = '10px monospace';
+        ctx.fillText(`(${target.x},y${target.y}) r${target.rotation}`, 4, 10);
+      } else {
+        const tx = target.x * cell + cell / 2;
+        const ty = visY * cell + cell / 2;
+        ctx.strokeStyle = '#6cf';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(tx - 8, ty);
+        ctx.lineTo(tx + 8, ty);
+        ctx.moveTo(tx, ty - 8);
+        ctx.lineTo(tx, ty + 8);
+        ctx.stroke();
+        ctx.fillStyle = '#6cf';
+        ctx.font = '10px monospace';
+        ctx.fillText(`r${target.rotation}`, tx + 6, ty - 6);
       }
     }
     wrapper.appendChild(canvas);

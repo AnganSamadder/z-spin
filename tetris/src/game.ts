@@ -30,5 +30,5 @@ const config: Phaser.Types.Core.GameConfig = {
 };
 
 window.onload = () => {
-    const game = new Phaser.Game(config);
+    new Phaser.Game(config);
 };

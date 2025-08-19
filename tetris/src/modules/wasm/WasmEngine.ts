@@ -1,6 +1,6 @@
 import { GameScene } from '../../scenes/GameScene';
 import WasmLoader from './WasmLoader';
-import { GameSettings, Strategy, DEFAULT_SETTINGS } from '../../types';
+import { GameSettings, DEFAULT_SETTINGS } from '../../types';
 import { TETROMINOES, KICK_DATA_JLSTZ, KICK_DATA_I } from '../../constants';
 import { BotController, LocalGameController } from './BotController';
 
@@ -209,6 +209,18 @@ export class WasmEngine {
     return { x, y, rotation };
   }
 
+  // Compute expected lock Y from a given stance using current physics
+  private computeLockYAt(x: number, y: number, rotation: number, typeKey: string): number {
+    const physics = this.gameScene.gameLogic.physics;
+    const shape = (TETROMINOES as any)[typeKey]?.shapes?.[rotation];
+    if (!shape) return y;
+    let testY = y;
+    while (!physics.checkCollision(x, testY + 1, shape, typeKey as any)) {
+      testY += 1;
+    }
+    return testY;
+  }
+
   // Simulate a single non-mutating move for finesse planning
   private simulateOne(x: number, y: number, rotation: number, typeKey: string, move: string): { x: number, y: number, rotation: number } | null {
     const tetrominoData = (TETROMINOES as any)[typeKey];
@@ -386,17 +398,43 @@ export class WasmEngine {
     // Hold-aware: compute held index and canHold
     const heldIndex = state.heldTetromino ? WasmLoader.TETROMINO_TYPE_MAP[state.heldTetromino.typeKey] : -1;
     const canHold = state.canHold === true;
-    const sequence = this.wasmEngine.getFullMoveSequenceWithPositionAndHold(
-      board,
-      currentPieceTypeIndex,
-      currentX,
-      currentY,
-      currentRotation,
-      nextPieceTypeIndex,
-      heldIndex,
-      canHold,
-      strategy
-    );
+    let sequence: string;
+    let targetFromRust: { x: number; y: number; rotation: number } | null = null;
+    try {
+      // Optional enhanced API that returns { sequence, target }
+      const payload = this.wasmEngine.getFullMoveSequenceWithTarget(
+        board,
+        currentPieceTypeIndex,
+        currentX,
+        currentY,
+        currentRotation,
+        nextPieceTypeIndex,
+        heldIndex,
+        canHold,
+        strategy
+      );
+      const parsed = JSON.parse(payload);
+      sequence = String(parsed.sequence || '');
+      if (parsed && parsed.target) {
+        targetFromRust = {
+          x: parsed.target.x | 0,
+          y: parsed.target.y | 0,
+          rotation: parsed.target.rotation | 0,
+        };
+      }
+    } catch (_e) {
+      sequence = this.wasmEngine.getFullMoveSequenceWithPositionAndHold(
+        board,
+        currentPieceTypeIndex,
+        currentX,
+        currentY,
+        currentRotation,
+        nextPieceTypeIndex,
+        heldIndex,
+        canHold,
+        strategy
+      );
+    }
     this.wasmEngine.configureLogging(false);
     // Best-effort parse of last Rust logs via console interception is not available here;
     // We'll fill intuition later using known weights/sequence.
@@ -405,6 +443,17 @@ export class WasmEngine {
     // The Rust logs will show "🎯 Target placement details: From current (x, y) rot R → target (X, Y) rot R"
     // For now, we'll capture it during sequence execution
 
+    if (targetFromRust) {
+      this.expectedFinalPosition = { x: targetFromRust.x, y: targetFromRust.y, rotation: targetFromRust.rotation };
+    } else {
+      const moves = sequence.split(',');
+      const stance = this.previewPreHardDropStance(moves);
+      const cur = this.gameScene.gameState.currentTetromino;
+      if (stance && cur) {
+        const lockY = this.computeLockYAt(stance.x, stance.y, stance.rotation, cur.typeKey);
+        this.expectedFinalPosition = { x: stance.x, y: lockY, rotation: stance.rotation };
+      }
+    }
     this.executeFullSequence(sequence);
   }
 
@@ -430,10 +479,18 @@ export class WasmEngine {
     // Timed execution for visibility; pause per-tick updates while playing
     const prevActive = this.isActive;
     this.isActive = false;
+    // Pause gravity and player inputs while executing an atomic sequence to avoid mid-sequence spawns
+    const gravityWasPaused = (this.gameScene as any).isGravityPaused ? (this.gameScene as any).isGravityPaused() : false;
+    if ((this.gameScene as any).pauseGravity) {
+      (this.gameScene as any).pauseGravity();
+    }
+    if ((this.gameScene as any).setLockDelaySuspended) {
+      (this.gameScene as any).setLockDelaySuspended(true);
+    }
     this.isPlayingSequence = true;
     let index = 0;
     // Capture a per-piece token to guard against spawn swaps during the sequence
-    const startType = this.gameScene.gameState.currentTetromino?.typeKey;
+    let trackedType = this.gameScene.gameState.currentTetromino?.typeKey;
     const lastMoveInSequence = moves[moves.length - 1] || '';
     const step = () => {
       if (index >= moves.length) {
@@ -467,22 +524,56 @@ export class WasmEngine {
         // Restore state
         this.isPlayingSequence = false;
         this.isActive = prevActive;
+        if ((this.gameScene as any).setLockDelaySuspended) {
+          (this.gameScene as any).setLockDelaySuspended(false);
+        }
+        if (!gravityWasPaused && (this.gameScene as any).resumeGravity) {
+          (this.gameScene as any).resumeGravity();
+        }
         return;
       }
       const currentMove = moves[index++];
-      // Despawn guard: stop if piece identity changed unexpectedly before last move
+      // Despawn/identity guard: allow identity change for hold and hard_drop; otherwise replan
       const liveType = this.gameScene.gameState.currentTetromino?.typeKey;
-      if (startType && liveType && liveType !== startType && currentMove !== 'hard_drop') {
-        console.warn(`⛔ DESYNC: piece changed from ${startType} to ${liveType} mid-sequence. Aborting and replanning.`);
+      if (trackedType && liveType && liveType !== trackedType && currentMove !== 'hard_drop' && currentMove !== 'hold' && currentMove !== 'spawn') {
+        console.warn(`⛔ DESYNC: piece changed from ${trackedType} to ${liveType} mid-sequence. Aborting and replanning.`);
         this.isPlayingSequence = false;
         this.isActive = prevActive;
+        if ((this.gameScene as any).setLockDelaySuspended) {
+          (this.gameScene as any).setLockDelaySuspended(false);
+        }
+        if (!gravityWasPaused && (this.gameScene as any).resumeGravity) {
+          (this.gameScene as any).resumeGravity();
+        }
         this.replanFromCurrent();
         return;
       }
-      // If a hold occurs earlier in the sequence, discard precomputed stance alignment as piece identity changes
-      if (currentMove === 'hold') {
-        this.expectedPreHardDrop = null;
+      // Interpret soft_drop conservatively when additional moves remain: step down once to preserve lateral/rotational room
+      if (currentMove === 'soft_drop') {
+        const s = this.gameScene.gameState.currentTetromino;
+        const nextMove = moves[index];
+        if (s) {
+          // If next move is not a terminal hard_drop, step a single row
+          if (nextMove && nextMove !== 'hard_drop') {
+            const can = !this.gameScene.gameLogic.physics.checkCollision(s.x, s.y + 1, s.shape);
+            if (can) {
+              this.controller.moveDown();
+            }
+          } else {
+            // If hard_drop is next, allow deeper descent toward expected lock y for nicer alignment
+            const targetY = this.expectedFinalPosition ? this.expectedFinalPosition.y : s.y + 1;
+            while (s && s.y < targetY) {
+              const can = !this.gameScene.gameLogic.physics.checkCollision(s.x, s.y + 1, s.shape);
+              if (!can) break;
+              this.controller.moveDown();
+            }
+          }
+        }
+        const delay = Math.max(0, this.sequencePlaybackDelayMs);
+        setTimeout(step, delay);
+        return;
       }
+      // (Moved hold handling to after executeMove so it sees the swapped piece)
       // Before executing hard_drop, verify stance matches preview and correct with taps/rot if needed
       if (currentMove === 'hard_drop') {
         // Compute once per sequence
@@ -490,7 +581,7 @@ export class WasmEngine {
           this.expectedPreHardDrop = this.previewPreHardDropStance(moves);
         }
         const stance = this.expectedPreHardDrop;
-        let s = this.gameScene.gameState.currentTetromino;
+        const s = this.gameScene.gameState.currentTetromino;
         if (stance && s) {
           // Use a finesse planner to reach the stance (minimal inputs, SRS-aware). Execute plan immediately before drop.
           const finesseMoves = this.planFinesseAlignmentToStance({ x: stance.x, rotation: stance.rotation });
@@ -510,8 +601,45 @@ export class WasmEngine {
             }
           }
         }
+        // If we have an expected final pose, ensure Y matches expected lock before dropping
+        const cur = this.gameScene.gameState.currentTetromino;
+        if (cur && this.expectedFinalPosition) {
+          const expectedLockY = this.expectedFinalPosition.y;
+          // If above expected lock, allow micro soft-drops until reaching expectedLockY
+          while (cur.y < expectedLockY) {
+            const can = !this.gameScene.gameLogic.physics.checkCollision(cur.x, cur.y + 1, cur.shape);
+            if (!can) break;
+            this.controller.moveDown();
+          }
+        }
       }
       this.executeMove(currentMove);
+      // If we executed a hold/spawn, recompute stance/target for the remainder using the new piece
+      if (currentMove === 'hold' || currentMove === 'spawn') {
+        trackedType = this.gameScene.gameState.currentTetromino?.typeKey;
+        this.expectedPreHardDrop = null;
+        const remaining = moves.slice(index);
+        this.expectedPreHardDrop = this.previewPreHardDropStance(remaining);
+        const cur = this.gameScene.gameState.currentTetromino;
+        if (this.expectedPreHardDrop && cur) {
+          const lockY = this.computeLockYAt(this.expectedPreHardDrop.x, this.expectedPreHardDrop.y, this.expectedPreHardDrop.rotation, cur.typeKey);
+          this.expectedFinalPosition = { x: this.expectedPreHardDrop.x, y: lockY, rotation: this.expectedPreHardDrop.rotation };
+        } else {
+          this.expectedFinalPosition = null;
+        }
+        // Gracefully end current atomic playback before replanning
+        this.isPlayingSequence = false;
+        this.isActive = prevActive;
+        if ((this.gameScene as any).setLockDelaySuspended) {
+          (this.gameScene as any).setLockDelaySuspended(false);
+        }
+        if (!gravityWasPaused && (this.gameScene as any).resumeGravity) {
+          (this.gameScene as any).resumeGravity();
+        }
+        // Replan from the new post-hold state
+        this.replanFromCurrent();
+        return;
+      }
       const delay = Math.max(0, this.sequencePlaybackDelayMs);
       setTimeout(step, delay);
     };
@@ -565,20 +693,33 @@ export class WasmEngine {
     }
   }
 
-  private pushDebugRecord(sequence: string): void {
-    const gs = this.gameScene.gameState;
-    const after = this.captureBoard20x10();
+  private pushDebugRecord(_sequence: string): void {
     // Try to reconstruct "before" by removing the last placed piece is complex;
     // instead, capture before at sequence start:
     // For now, we approximate: use current logs' first ACTUAL FINAL BOARD STATE if previously saved, else capture at start.
     // We'll store before at sequence start in expectedPreHardDrop moment.
   }
 
-  public update(time: number, delta: number): void {
+  public update(time: number, _delta: number): void {
     if (this.isPlayingSequence) {
       return; // pause tick-driven moves while playing a full sequence for visibility
     }
     if (!this.isActive || !this.wasmEngine || !this.gameScene.gameState.currentTetromino) {
+      return;
+    }
+
+    // Stop immediately on game over to avoid move spam
+    const gs0 = this.gameScene.gameState;
+    if (gs0.gameOver) {
+      this.deactivate();
+      (this.gameScene as any).isWasmActive = false;
+      const toggleButton = document.getElementById('wasmToggleBtn') as HTMLButtonElement | null;
+      if (toggleButton) toggleButton.textContent = 'Play WASM Engine';
+      return;
+    }
+
+    // If current piece cannot be manipulated (locking/topped out), skip ticking to avoid blocked move logs
+    if (!gs0.canManipulatePiece) {
       return;
     }
 
@@ -696,33 +837,80 @@ export class WasmEngine {
       case 'move_right':
         this.controller.moveRight();
         break;
-      case 'move_to_left':
+      case 'move_to_left': {
+        const s0 = this.gameScene.gameState.currentTetromino;
+        if (!s0) break;
+        const targetX = (this.expectedPreHardDrop?.x ?? this.expectedFinalPosition?.x);
         if (this.strictHumanInputs) {
-          // simulate holding left: emit left taps until blocked
-          while (true) {
-            const s = this.gameScene.gameState.currentTetromino;
-            if (!s) break;
-            const can = !this.gameScene.gameLogic.physics.checkCollision(s.x - 1, s.y, s.shape);
-            if (!can) break;
-            this.controller.moveLeft();
+          if (typeof targetX === 'number') {
+            // Clamp toward targetX to avoid overshoot
+            while (true) {
+              const s = this.gameScene.gameState.currentTetromino;
+              if (!s) break;
+              if (s.x <= targetX) break;
+              const can = !this.gameScene.gameLogic.physics.checkCollision(s.x - 1, s.y, s.shape);
+              if (!can) {
+                // Allow micro-drop if still above expected lock to sneak under ledges
+                if (this.expectedFinalPosition && s.y < this.expectedFinalPosition.y) {
+                  const canDown = !this.gameScene.gameLogic.physics.checkCollision(s.x, s.y + 1, s.shape);
+                  if (canDown) { this.controller.moveDown(); continue; }
+                }
+                break;
+              }
+              this.controller.moveLeft();
+            }
+          } else {
+            // Fallback: to wall
+            while (true) {
+              const s = this.gameScene.gameState.currentTetromino;
+              if (!s) break;
+              const can = !this.gameScene.gameLogic.physics.checkCollision(s.x - 1, s.y, s.shape);
+              if (!can) break;
+              this.controller.moveLeft();
+            }
           }
         } else {
           this.controller.moveToLeft();
         }
         break;
-      case 'move_to_right':
+      }
+      case 'move_to_right': {
+        const s0 = this.gameScene.gameState.currentTetromino;
+        if (!s0) break;
+        const targetX = (this.expectedPreHardDrop?.x ?? this.expectedFinalPosition?.x);
         if (this.strictHumanInputs) {
-          while (true) {
-            const s = this.gameScene.gameState.currentTetromino;
-            if (!s) break;
-            const can = !this.gameScene.gameLogic.physics.checkCollision(s.x + 1, s.y, s.shape);
-            if (!can) break;
-            this.controller.moveRight();
+          if (typeof targetX === 'number') {
+            // Clamp toward targetX to avoid overshoot
+            while (true) {
+              const s = this.gameScene.gameState.currentTetromino;
+              if (!s) break;
+              if (s.x >= targetX) break;
+              const can = !this.gameScene.gameLogic.physics.checkCollision(s.x + 1, s.y, s.shape);
+              if (!can) {
+                // Allow micro-drop if still above expected lock to sneak under ledges
+                if (this.expectedFinalPosition && s.y < this.expectedFinalPosition.y) {
+                  const canDown = !this.gameScene.gameLogic.physics.checkCollision(s.x, s.y + 1, s.shape);
+                  if (canDown) { this.controller.moveDown(); continue; }
+                }
+                break;
+              }
+              this.controller.moveRight();
+            }
+          } else {
+            // Fallback: to wall
+            while (true) {
+              const s = this.gameScene.gameState.currentTetromino;
+              if (!s) break;
+              const can = !this.gameScene.gameLogic.physics.checkCollision(s.x + 1, s.y, s.shape);
+              if (!can) break;
+              this.controller.moveRight();
+            }
           }
         } else {
           this.controller.moveToRight();
         }
         break;
+      }
       case 'rotate':
         this.controller.rotateCW();
         break;
@@ -732,12 +920,13 @@ export class WasmEngine {
       case 'rotate_180':
         this.controller.rotate180();
         break;
-      case 'soft_drop':
+      case 'soft_drop': {
+        // Interpret engine's soft_drop as controlled descent toward expectedFinalPosition if available; otherwise step once
+        const s = this.gameScene.gameState.currentTetromino;
+        if (!s) break;
+        const targetY = this.expectedFinalPosition ? this.expectedFinalPosition.y : s.y + 1;
         if (this.strictHumanInputs) {
-          // simulate soft-drop hold: step down until landed
-          while (true) {
-            const s = this.gameScene.gameState.currentTetromino;
-            if (!s) break;
+          while (s && s.y < targetY) {
             const can = !this.gameScene.gameLogic.physics.checkCollision(s.x, s.y + 1, s.shape);
             if (!can) break;
             this.controller.moveDown();
@@ -746,6 +935,7 @@ export class WasmEngine {
           this.controller.softDrop();
         }
         break;
+      }
       case 'move_down':
         this.controller.moveDown();
         break;
@@ -769,7 +959,7 @@ export class WasmEngine {
       case 'hold':
         this.controller.hold();
         break;
-      case 'game_over':
+      case 'game_over': {
         this.logInfo('WASM detected game over, deactivating engine');
         this.deactivate();
         this.gameScene.isWasmActive = false;
@@ -779,6 +969,7 @@ export class WasmEngine {
           toggleButton.textContent = 'Play WASM Engine';
         }
         break;
+      }
       default:
         // No-op
         break;
