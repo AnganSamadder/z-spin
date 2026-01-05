@@ -15,14 +15,7 @@ express.static.mime.define({
   'application/wasm': ['wasm']
 });
 
-// Serve WASM files with the correct MIME type
-app.get('/wasm/*.wasm', (req, res) => {
-  const wasmPath = path.join(__dirname, req.path);
-  console.log(`Serving WASM file: ${wasmPath}`);
-  
-  res.setHeader('Content-Type', 'application/wasm');
-  fs.createReadStream(wasmPath).pipe(res);
-});
+
 
 // Serve static files from the 'dist' directory
 app.use(express.static(path.join(__dirname, 'dist')));

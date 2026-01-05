@@ -41,6 +41,42 @@ impl Board {
         (self.rows[row] & FULL_ROW) == FULL_ROW
     }
 
+    /// Checks if a cell is an empty hole fully covered by all 4 sides (filled blocks or walls).
+    pub fn is_fully_covered(&self, x: usize, y: usize) -> bool {
+        // Must be an empty cell
+        if self.get_cell(x, y) {
+            return false;
+        }
+
+        // Check Up (y+1)
+        if y < BOARD_HEIGHT - 1 && !self.get_cell(x, y + 1) {
+            return false;
+        }
+        // If y is at the top, it's not covered by a block, but "covered by sky" which is open. 
+        // Wait, "covered by all sides" usually means ENCLOSED. 
+        // A hole at the top of the board is NOT enclosed.
+        if y == BOARD_HEIGHT - 1 {
+            return false;
+        }
+        
+        // Check Down (y-1) - Floor counts as covering/boundary
+        if y > 0 && !self.get_cell(x, y - 1) {
+            return false;
+        }
+
+        // Check Left (x-1) - Wall counts as boundary
+        if x > 0 && !self.get_cell(x - 1, y) {
+            return false; // Open to left
+        }
+
+        // Check Right (x+1) - Wall counts as boundary
+        if x < BOARD_WIDTH - 1 && !self.get_cell(x + 1, y) {
+            return false; // Open to right
+        }
+
+        true
+    }
+
     pub fn set_cell(&mut self, x: usize, y: usize, filled: bool) {
         if x < BOARD_WIDTH && y < BOARD_HEIGHT {
             if filled {

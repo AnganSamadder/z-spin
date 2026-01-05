@@ -8,6 +8,7 @@ pub enum Strategy {
     Aggressive,
     Defensive,
     NineZero,
+    NineZeroRecovery,
     Cheese,
 }
 
@@ -300,6 +301,66 @@ impl EvaluationWeights {
                 use_dependency_exemption: true,  // NineZero REQUIRES well exemption
             },
             Strategy::Cheese => Self {
+                // Balanced downstacking: clear cheese while maintaining cleaner board
+                aggregate_height: -0.40,    // Much stronger penalty on height to prevent building up
+                max_height: -0.60,          // Very strong penalty on max height
+                bumpiness: -1.00,           // Strong penalty on bumpiness to force flat stacking
+                holes: -0.80,               // Much higher penalty on holes for cleaner board
+                completed_lines: 2.00,      // Very strongly reward any line clears
+                right_well_height_penalty: 0.0,
+                right_well_fill_penalty: 0.0,
+                tetris_ready_bonus: 0.0,
+                bumpiness_well_relief: 0.0,
+                well_depth_without_i_penalty: 0.0,
+                tetris_clear_bonus: 0.0,
+                // Aggressively reward any line clears while downstacking
+                non_tetris_clear_penalty_per_line: -1.00, // Strongly reward non-tetris clears
+                bumpiness_left9: 0.0,
+                // Low penalty for new holes (prioritize clearing over avoiding)
+                new_holes_penalty: 15.0,   // Higher penalty for new holes to keep cleaner
+                // Moderate downstack shaping
+                weighted_holes: -0.05,      // Higher penalty on weighted holes for cleanliness
+                blocks_above_holes_penalty: -0.25, // Reduced penalty on covering holes (height-weighted)
+                holes_cleared_bonus: 15.00, // Very strong bonus for clearing holes
+                // Strong downstack penalties for cheese clearing
+                cavity_cells: -0.5,         // Drastically reduced to encourage layering/flattening
+                cavity_cells_sq: -0.01,     // Minimal quadratic
+                overhang_cells: -0.2,       // Low penalty
+                overhang_cells_sq: -0.01,   // Minimal quadratic
+                covered_cells: -0.1,        // Very low penalty
+                covered_cells_sq: -0.00,    // Negligible
+                // Heavy penalty for building too high above cheese
+                cheese_height_penalty: -10.0, // Penalize building >3 rows above cheese
+                // Penalty for using non-I pieces to build high instead of clear
+                non_i_building_penalty: -2.0, // Strong penalty for wasting non-I pieces on building
+                // Additional flatness incentives
+                left9_height_range: -0.30,   // Penalize height range in left 9 columns for flatter building
+                // Advanced weight features - Cheese needs strong downstack pressure
+                row_transitions: -0.4,       // Reduced from -0.8 to reduce edge-stacking bias
+                jeopardy: -1.0,              // Strong penalty per row above 10
+                top_half_penalty: -8.0,      // Heavy penalty for height > 10
+                top_quarter_penalty: -20.0,  // Very heavy penalty for height > 15 (danger zone)
+                clear1: 4.0,                 // Reward singles
+                clear2: 6.0,                 // Reward doubles
+                clear3: 8.0,                 // Reward triples
+                clear4: 12.0,                // Reward Tetrises
+                tspin1: 2.0,                 // Reward T-spin singles
+                tspin2: 4.0,                 // Reward T-spin doubles
+                tspin3: 6.0,                 // Reward T-spin triples
+                mini_tspin1: 0.5,
+                mini_tspin2: 1.0,
+                well_column: 9,
+                well_depth_bonus: 0.0,       // No well bonus for cheese clearing
+                max_well_depth: 2,           // Shallow well max
+                // Dependency-aware well penalties (mild for Cheese - focus on clearing)
+                well_depth_2_penalty: -0.3,
+                well_depth_3_penalty: -0.8,
+                well_depth_4plus_penalty: -1.5,
+                wall_well_modifier: 1.1,
+                use_dependency_exemption: false,
+            },
+            Strategy::NineZeroRecovery => Self {
+                // COPY OF CHEESE STRATEGY
                 // Balanced downstacking: clear cheese while maintaining cleaner board
                 aggregate_height: -0.40,    // Much stronger penalty on height to prevent building up
                 max_height: -0.60,          // Very strong penalty on max height
