@@ -404,8 +404,8 @@ impl SearchEngine {
                     improved_sequence.push(move_action.clone());
                 },
                 "move_down" => {
-                    if board.can_place_piece(&sim_piece.moved(0, -1)) {
-                        sim_piece.y -= 1;
+                    if board.can_place_piece(&sim_piece.moved(0, 1)) {
+                        sim_piece.y += 1;
                     }
                     improved_sequence.push(move_action.clone());
                 },
@@ -539,11 +539,7 @@ impl SearchEngine {
             }
             
             // Only add to placements if all blocks are within bounds AND piece is locked (cannot move down)
-            let is_locked = !board.can_place_piece(&piece.moved(0, -1));
-
-            if debug && piece.piece_type == PieceType::I && piece.x == 9 && piece.y < 5 {
-                 console_log!("🕵️ I-Piece Trace x=9 y={}: is_valid={} is_locked={}", piece.y, is_valid_placement, is_locked);
-            }
+            let is_locked = !board.can_place_piece(&piece.moved(0, 1));
             
             if is_valid_placement && is_locked {
                 if debug && placements.len() < 20 {
@@ -559,7 +555,7 @@ impl SearchEngine {
 
             // Successor states with kick-aware rotations
             let mut moves = vec![
-                piece.moved(0, -1),   // Soft Drop (Gravity goes DOWN)
+                piece.moved(0, 1),   // Soft Drop (gravity - y increases downward)
                 piece.moved(1, 0),   // Right
                 piece.moved(-1, 0),  // Left
             ];
@@ -712,8 +708,8 @@ impl SearchEngine {
         }
 
         // Always evaluate the landed (gravity-resolved) position to avoid mid-air locks
-        while board.can_place_piece(&piece.moved(0, -1)) {
-            piece = piece.moved(0, -1);
+        while board.can_place_piece(&piece.moved(0, 1)) {
+            piece = piece.moved(0, 1);
         }
 
         let mut predicted_board = board.clone();
