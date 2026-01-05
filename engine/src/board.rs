@@ -182,6 +182,80 @@ impl Board {
         (total_height, max_height, holes, bumpiness)
     }
 
+    /// Calculate dependency-aware penalty for wells
+    /// Penalizes wells based on which pieces can fill them:
+    /// - 2-deep: L/J/I can fill (mild penalty)
+    /// - 3-deep: Only I can fill (strong penalty)
+    /// - 4+deep: Only I, multiple pieces needed (very strong penalty)
+    /// 
+    /// Also applies wall modifier for wells against board edges (fewer fill options)
+    pub fn calculate_dependency_penalty(
+        &self, 
+        exempt_column: Option<usize>, // Optional designated well column (e.g., Some(9) for 9-0)
+        depth_2_penalty: f64,      // Penalty for 2-deep wells
+        depth_3_penalty: f64,      // Penalty for 3-deep wells (I-only)
+        depth_4plus_penalty: f64,  // Penalty for 4+ deep wells
+        wall_modifier: f64,        // Multiplier for wells against walls (1.0 = no extra)
+    ) -> f64 {
+        let heights = self.get_heights();
+        let mut total_penalty = 0.0;
+        
+        for col in 0..BOARD_WIDTH {
+            // Skip the exempt well column if provided
+            if let Some(exempt) = exempt_column {
+                if col == exempt {
+                    continue;
+                }
+            }
+            
+            // Calculate well depth at this column
+            // Well depth = min(left_neighbor_height, right_neighbor_height) - this_height
+            let this_height = heights[col];
+            
+            // Get neighbor heights (treat board edges as infinitely high)
+            let left_height = if col == 0 { 
+                40 // Wall = very high
+            } else { 
+                heights[col - 1] 
+            };
+            
+            let right_height = if col == BOARD_WIDTH - 1 { 
+                40 // Wall = very high
+            } else { 
+                heights[col + 1] 
+            };
+            
+            // Well depth is how much lower this column is than its shortest neighbor
+            let min_neighbor = left_height.min(right_height);
+            if this_height >= min_neighbor {
+                continue; // Not a well
+            }
+            
+            let well_depth = min_neighbor - this_height;
+            
+            // A side is "restricted" (like a wall) if it's the board edge 
+            // OR if the piece can't protrude into it (neighbor > well_bottom + 2)
+            let left_restricted = col == 0 || left_height > this_height + 2;
+            let right_restricted = col == BOARD_WIDTH - 1 || right_height > this_height + 2;
+            
+            let is_restricted = left_restricted || right_restricted;
+            let wall_mult = if is_restricted { wall_modifier } else { 1.0 };
+            
+            // Apply penalty based on depth
+            let base_penalty = match well_depth {
+                0 | 1 => 0.0,  // Shallow wells are fine
+                2 => depth_2_penalty,  // L/J can fill
+                3 => depth_3_penalty,  // I-only dependency
+                _ => depth_4plus_penalty * (well_depth - 3) as f64,  // Very deep - scales with depth
+            };
+            
+            total_penalty += base_penalty * wall_mult;
+        }
+        
+        total_penalty
+    }
+
+
     /// Calculate penalty for building too high above cheese lines
     /// Returns penalty based on how many rows are built above the cheese
     pub fn get_cheese_height_penalty(&self) -> f64 {

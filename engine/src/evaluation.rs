@@ -73,6 +73,14 @@ pub struct EvaluationWeights {
     pub well_column: usize,             // preferred well column (0-9, default 9)
     pub well_depth_bonus: f64,          // bonus per level of well depth
     pub max_well_depth: usize,          // max well depth to reward (default 4)
+    
+    // === NEW: Dependency-aware well penalties ===
+    // Penalizes wells based on which pieces can fill them
+    pub well_depth_2_penalty: f64,      // 2-deep wells (L/J/I can fill) - mild penalty
+    pub well_depth_3_penalty: f64,      // 3-deep wells (I-only) - strong penalty  
+    pub well_depth_4plus_penalty: f64,  // 4+ deep wells - very strong penalty
+    pub wall_well_modifier: f64,        // Extra penalty multiplier for wells against walls (1.0 = no extra)
+    pub use_dependency_exemption: bool, // If true, well_column is exempt from these penalties
 }
 
 impl EvaluationWeights {
@@ -122,6 +130,12 @@ impl EvaluationWeights {
                 well_column: 9,                  // Right well default
                 well_depth_bonus: 0.0,
                 max_well_depth: 4,
+                // Dependency-aware well penalties (disabled for Balanced)
+                well_depth_2_penalty: 0.0,
+                well_depth_3_penalty: 0.0,
+                well_depth_4plus_penalty: 0.0,
+                wall_well_modifier: 1.0,
+                use_dependency_exemption: false,
             },
             Strategy::Aggressive => Self {
                 aggregate_height: -0.3,
@@ -167,6 +181,12 @@ impl EvaluationWeights {
                 well_column: 9,
                 well_depth_bonus: 0.0,
                 max_well_depth: 4,
+                // Dependency-aware well penalties (disabled for Aggressive)
+                well_depth_2_penalty: 0.0,
+                well_depth_3_penalty: 0.0,
+                well_depth_4plus_penalty: 0.0,
+                wall_well_modifier: 1.0,
+                use_dependency_exemption: false,
             },
             Strategy::Defensive => Self {
                 aggregate_height: -0.8,
@@ -212,8 +232,15 @@ impl EvaluationWeights {
                 well_column: 9,
                 well_depth_bonus: 0.5,           // Slight well depth bonus
                 max_well_depth: 4,
+                // Dependency-aware well penalties (mild for Defensive)
+                well_depth_2_penalty: -0.5,
+                well_depth_3_penalty: -1.0,
+                well_depth_4plus_penalty: -2.0,
+                wall_well_modifier: 1.2,
+                use_dependency_exemption: false,
             },
             Strategy::NineZero => Self {
+                // ORIGINAL WORKING WEIGHTS from fd8378d
                 // Core weights: play clean, reward clears, very anti-holes
                 aggregate_height: -0.62,
                 max_height: -0.35,
@@ -236,34 +263,41 @@ impl EvaluationWeights {
                 left9_height_range: -0.20,
                 // New holes are extremely undesirable in 9-0
                 new_holes_penalty: 50.0,
+                // The following weights were added later - set to 0 (disabled)
                 weighted_holes: 0.0,
                 blocks_above_holes_penalty: 0.0,
                 holes_cleared_bonus: 0.0,
-                cavity_cells: -1.0,              // Moderate cavity penalty
-                cavity_cells_sq: -0.05,
-                overhang_cells: -0.5,
-                overhang_cells_sq: -0.02,
-                covered_cells: -0.3,
-                covered_cells_sq: -0.01,
+                cavity_cells: 0.0,               // DISABLED - was breaking stacking
+                cavity_cells_sq: 0.0,
+                overhang_cells: 0.0,             // DISABLED - was breaking stacking
+                overhang_cells_sq: 0.0,
+                covered_cells: 0.0,
+                covered_cells_sq: 0.0,
                 cheese_height_penalty: 0.0,
                 non_i_building_penalty: 0.0,
-                // Advanced weight features - NineZero is Tetris-focused
-                row_transitions: -0.5,           // Mild penalty for fragmented rows
-                jeopardy: 0.0,                   // No jeopardy - 9-0 intentionally builds
+                row_transitions: 0.0,            // DISABLED - was breaking stacking
+                jeopardy: 0.0,
                 top_half_penalty: 0.0,
-                top_quarter_penalty: -10.0,      // Penalty only in danger zone
-                clear1: -10.0,                   // Heavily punish singles (breaks efficiency)
-                clear2: -5.0,                    // Punish doubles
-                clear3: -2.0,                    // Slight punishment for triples
-                clear4: 40.0,                    // Heavily reward Tetrises
-                tspin1: 1.0,
-                tspin2: 3.0,
-                tspin3: 5.0,
-                mini_tspin1: -1.0,               // Punish mini T-spins (wasteful)
+                top_quarter_penalty: 0.0,        // DISABLED - was breaking stacking
+                clear1: 0.0,                     // DISABLED - let tetris_clear_bonus handle it
+                clear2: 0.0,
+                clear3: 0.0,
+                clear4: 0.0,                     // DISABLED - already have tetris_clear_bonus: 40.0
+                tspin1: 0.0,
+                tspin2: 0.0,
+                tspin3: 0.0,
+                mini_tspin1: 0.0,
                 mini_tspin2: 0.0,
                 well_column: 9,                  // Right well for 9-0
-                well_depth_bonus: 2.0,           // Strong well depth bonus
+                well_depth_bonus: 0.0,           // DISABLED - original didn't have this
                 max_well_depth: 4,
+                // Dependency-aware well penalties - KEY FOR FLAT STACKING
+                // These replace simple bumpiness by penalizing based on piece dependency
+                well_depth_2_penalty: -1.0,      // 2-deep wells (L/J can fill) - mild
+                well_depth_3_penalty: -3.0,      // 3-deep wells (I-only) - strong!
+                well_depth_4plus_penalty: -5.0,  // 4+ deep - very bad, requires multiple I
+                wall_well_modifier: 1.3,         // Extra penalty for wall-adjacent wells
+                use_dependency_exemption: true,  // NineZero REQUIRES well exemption
             },
             Strategy::Cheese => Self {
                 // Balanced downstacking: clear cheese while maintaining cleaner board
@@ -317,6 +351,12 @@ impl EvaluationWeights {
                 well_column: 9,
                 well_depth_bonus: 0.0,       // No well bonus for cheese clearing
                 max_well_depth: 2,           // Shallow well max
+                // Dependency-aware well penalties (mild for Cheese - focus on clearing)
+                well_depth_2_penalty: -0.3,
+                well_depth_3_penalty: -0.8,
+                well_depth_4plus_penalty: -1.5,
+                wall_well_modifier: 1.1,
+                use_dependency_exemption: false,
             },
         }
     }
@@ -434,6 +474,12 @@ impl Default for EvaluationWeights {
             well_column: 9,
             well_depth_bonus: 0.0,
             max_well_depth: 4,
+            // Dependency-aware well penalties - disabled by default
+            well_depth_2_penalty: 0.0,
+            well_depth_3_penalty: 0.0,
+            well_depth_4plus_penalty: 0.0,
+            wall_well_modifier: 1.0,
+            use_dependency_exemption: false,
         }
     }
 }
@@ -640,6 +686,29 @@ impl Board {
             }
             
             score += well_depth as f64 * weights.well_depth_bonus;
+        }
+
+        // Dependency-aware well penalties
+        // Penalizes wells based on which pieces can fill them:
+        // 2-deep = L/J can fill (mild), 3+ deep = I-only (strong)
+        if weights.well_depth_2_penalty != 0.0 
+            || weights.well_depth_3_penalty != 0.0 
+            || weights.well_depth_4plus_penalty != 0.0 
+        {
+            let exempt_col = if weights.use_dependency_exemption {
+                Some(weights.well_column)
+            } else {
+                None
+            };
+            
+            let dependency_penalty = self.calculate_dependency_penalty(
+                exempt_col,
+                weights.well_depth_2_penalty,
+                weights.well_depth_3_penalty,
+                weights.well_depth_4plus_penalty,
+                weights.wall_well_modifier,
+            );
+            score += dependency_penalty;
         }
 
         Evaluation {
