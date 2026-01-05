@@ -49,3 +49,11 @@ ehthumbs.db
 # Debug files
 debug.log
 .reference/
+
+# Local debugging logs and traces
+engine/all_logs.txt
+engine/full_log.txt
+engine/log_output.txt
+engine/result_*.txt
+engine/trace_*.txt
+engine/src/bin/
