@@ -404,8 +404,8 @@ impl SearchEngine {
                     improved_sequence.push(move_action.clone());
                 },
                 "move_down" => {
-                    if board.can_place_piece(&sim_piece.moved(0, 1)) {
-                        sim_piece.y += 1;
+                    if board.can_place_piece(&sim_piece.moved(0, -1)) {
+                        sim_piece.y -= 1;
                     }
                     improved_sequence.push(move_action.clone());
                 },
@@ -506,7 +506,7 @@ impl SearchEngine {
         }
         
         let mut iterations = 0;
-        const MAX_ITERATIONS: usize = 2000;
+        const MAX_ITERATIONS: usize = 100000; // Massively increased
         
         while let Some(piece) = queue.pop_front() {
             iterations += 1;
@@ -524,7 +524,8 @@ impl SearchEngine {
                     for bit_pos in 0..16 {
                         if (row_mask & (1 << bit_pos)) != 0 {
                             let block_x = bit_pos as i32;
-                            let block_y = piece.y + row_idx as i32;
+                            // Mask rows are: [y-1, y+0, y+1, y+2], so row_idx 0 = y-1
+                            let block_y = piece.y + (row_idx as i32) - 1;
                             
                             // Reject if block is outside board bounds
                             if block_x < 0 || block_x >= 10 || block_y < 0 || block_y >= 40 {
@@ -537,8 +538,17 @@ impl SearchEngine {
                 }
             }
             
-            // Only add to placements if all blocks are within bounds
-            if is_valid_placement {
+            // Only add to placements if all blocks are within bounds AND piece is locked (cannot move down)
+            let is_locked = !board.can_place_piece(&piece.moved(0, -1));
+
+            if debug && piece.piece_type == PieceType::I && piece.x == 9 && piece.y < 5 {
+                 console_log!("🕵️ I-Piece Trace x=9 y={}: is_valid={} is_locked={}", piece.y, is_valid_placement, is_locked);
+            }
+            
+            if is_valid_placement && is_locked {
+                if debug && placements.len() < 20 {
+                    console_log!("   📍 Found locked placement #{}: ({}, {}) rot {}", placements.len() + 1, piece.x, piece.y, piece.rotation);
+                }
                 placements.push(Placement {
                     x: piece.x,
                     y: piece.y,
@@ -546,9 +556,10 @@ impl SearchEngine {
                 });
             }
 
+
             // Successor states with kick-aware rotations
             let mut moves = vec![
-                piece.moved(0, 1),   // Soft Drop
+                piece.moved(0, -1),   // Soft Drop (Gravity goes DOWN)
                 piece.moved(1, 0),   // Right
                 piece.moved(-1, 0),  // Left
             ];
@@ -596,6 +607,104 @@ impl SearchEngine {
         final_placements
     }
 
+    /// Public debug method for CLI testing - generates all placements with stdout output
+    pub fn generate_all_placements_debug(&self, board: &Board, piece_type: PieceType, current_x: i32, current_y: i32, current_rotation: usize) -> Vec<Placement> {
+        let mut placements = Vec::new();
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+        
+        println!("✅ Starting from current position: ({}, {}) rotation {}", current_x, current_y, current_rotation);
+        
+        // Start from current position
+        let start_piece = Piece::new(piece_type, current_x, current_y).with_rotation(current_rotation);
+        if board.can_place_piece(&start_piece) {
+            queue.push_back(start_piece);
+            visited.insert((current_x, current_y, current_rotation));
+        } else {
+            println!("❌ Cannot place piece at start position!");
+            return placements;
+        }
+        
+        let mut iterations = 0;
+        const MAX_ITERATIONS: usize = 10000;
+        
+        while let Some(piece) = queue.pop_front() {
+            iterations += 1;
+            if iterations > MAX_ITERATIONS {
+                println!("⚠️ BFS reached max iterations limit");
+                break;
+            }
+            
+            // Validate placement
+            let mut is_valid_placement = true;
+            if let Some(mask) = piece.get_mask() {
+                for (row_idx, &row_mask) in mask.iter().enumerate() {
+                    if row_mask == 0 { continue; }
+                    
+                    for bit_pos in 0..16 {
+                        if (row_mask & (1 << bit_pos)) != 0 {
+                            let block_x = bit_pos as i32;
+                            // Mask rows are: [y-1, y+0, y+1, y+2], so row_idx 0 = y-1
+                            let block_y = piece.y + (row_idx as i32) - 1;
+                            
+                            if block_x < 0 || block_x >= 10 || block_y < 0 || block_y >= 40 {
+                                is_valid_placement = false;
+                                break;
+                            }
+                        }
+                    }
+                    if !is_valid_placement { break; }
+                }
+            }
+            
+            // Only add if locked (cannot move down)
+            let is_locked = !board.can_place_piece(&piece.moved(0, 1));
+            if is_valid_placement && is_locked {
+                println!("   📍 Found locked placement #{}: ({}, {}) rot {}", placements.len() + 1, piece.x, piece.y, piece.rotation);
+                placements.push(Placement {
+                    x: piece.x,
+                    y: piece.y,
+                    rotation: piece.rotation,
+                });
+            }
+            
+            // Successor states
+            let mut moves = vec![
+                piece.moved(0, 1),   // Soft Drop
+                piece.moved(1, 0),   // Right
+                piece.moved(-1, 0),  // Left
+            ];
+            
+            // Add kick-aware rotations
+            if let Some(cw_piece) = piece.try_rotate_clockwise(board) {
+                moves.push(cw_piece);
+            }
+            if let Some(ccw_piece) = piece.try_rotate_counter_clockwise(board) {
+                moves.push(ccw_piece);
+            }
+            if let Some(rot180_piece) = piece.try_rotate_180(board) {
+                moves.push(rot180_piece);
+            }
+    
+            for next_piece in &moves {
+                if visited.insert((next_piece.x, next_piece.y, next_piece.rotation)) {
+                    if board.can_place_piece(next_piece) {
+                        queue.push_back(*next_piece);
+                    }
+                }
+            }
+        }
+        
+        println!("✅ Placement generation COMPLETE: {} total placements found in {} iterations", placements.len(), iterations);
+        placements
+    }
+
+    /// Public debug method for CLI testing - generates move sequence with stdout output
+    pub fn generate_move_sequence_debug(&self, board: &Board, piece_type: PieceType, current_x: i32, current_y: i32, current_rotation: usize, target: &Placement) -> Vec<String> {
+        self.generate_move_sequence(board, piece_type, current_x, current_y, current_rotation, target, 16, 100, true, true)
+    }
+
+
     fn evaluate_placement(&self, board: &Board, piece_type: PieceType, placement: &Placement, weights: &EvaluationWeights) -> Option<PlacementEvaluation> {
         let mut piece = Piece::new(piece_type, placement.x, placement.y).with_rotation(placement.rotation);
         if !board.can_place_piece(&piece) {
@@ -603,8 +712,8 @@ impl SearchEngine {
         }
 
         // Always evaluate the landed (gravity-resolved) position to avoid mid-air locks
-        while board.can_place_piece(&piece.moved(0, 1)) {
-            piece = piece.moved(0, 1);
+        while board.can_place_piece(&piece.moved(0, -1)) {
+            piece = piece.moved(0, -1);
         }
 
         let mut predicted_board = board.clone();
@@ -634,6 +743,13 @@ impl SearchEngine {
         if new_holes > 0.0 && weights.new_holes_penalty > 0.0 {
             eval -= new_holes * weights.new_holes_penalty;
         }
+        // Reward for clearing existing holes (downstack progress)
+        let holes_cleared = (holes_before - holes_after).max(0.0);
+        if holes_cleared > 0.0 && weights.holes_cleared_bonus != 0.0 {
+            eval += holes_cleared * weights.holes_cleared_bonus;
+        }
+
+        // console_log!("   [Eval] Pos: ({}, {}), Rot: {} -> Score: {:.2} (Holes: {:.1}, NewHoles: {:.1})", placement.x, piece.y, placement.rotation, eval, holes_after, new_holes);
 
         Some(PlacementEvaluation {
             score: eval,
@@ -710,6 +826,10 @@ impl SearchEngine {
             
             if cost > dists.get(&(piece.x, piece.y, piece.rotation)).unwrap_or(&(usize::MAX, Vec::new())).0 {
                 continue;
+            }
+
+            if debug && iterations % 100 == 0 {
+                console_log!("   [Path] Iter: {}, Pos: ({}, {}), Rot: {}, Cost: {}, Path: [{}]", iterations, piece.x, piece.y, piece.rotation, cost, path.join(","));
             }
 
             // Check if we reached the actual target
@@ -911,38 +1031,38 @@ impl SearchEngine {
                     moves.push((one_down, "move_down", 1));
                 }
 
-                // Full soft drop to floor (discourage before aligned). Also allow micro soft-drops before rotations
+                // Full soft drop to floor - lower cost to favor horizontal-first paths
                 let mut sd_piece = piece.clone();
                 while board.can_place_piece(&sd_piece.moved(0, 1)) {
                     sd_piece.y += 1;
                 }
                 if sd_piece.y > piece.y {
+                    // Lower cost: favor aligning horizontally first, then soft drop
                     let misalign_x = (piece.x - target_x).abs() as usize;
-                    let rot_mismatch = if piece.rotation == target_rot { 0 } else { 2 };
-                    // Higher cost if not aligned horizontally or rotation not matching
-                    let sd_cost = 6 + misalign_x * 3 + rot_mismatch;
+                    // Cost of 2 base + 1 per column of misalignment
+                    let sd_cost = 2 + misalign_x;
                     moves.push((sd_piece, "soft_drop", sd_cost));
                 }
             }
 
-            // DAS-like moves: only use for simple placements. For complex (tuck/spin)
-            // we avoid wall-ride overshoot by forcing stepwise alignment.
-            if !allow_soft_drops {
-                let mut left_das_piece = piece.clone();
-                while board.can_place_piece(&left_das_piece.moved(-1, 0)) {
-                    left_das_piece.x -= 1;
-                }
-                if left_das_piece.x != piece.x {
-                    moves.push((left_das_piece, "move_to_left", 1)); // DAS hold counts as one input
-                }
+            // DAS-like moves: enabled for ALL placements for shorter paths
+            // Cost of 1 for all - DAS is efficient and should be preferred
+            let das_cost = 1;
+            
+            let mut left_das_piece = piece.clone();
+            while board.can_place_piece(&left_das_piece.moved(-1, 0)) {
+                left_das_piece.x -= 1;
+            }
+            if left_das_piece.x != piece.x {
+                moves.push((left_das_piece, "move_to_left", das_cost));
+            }
 
-                let mut right_das_piece = piece.clone();
-                while board.can_place_piece(&right_das_piece.moved(1, 0)) {
-                    right_das_piece.x += 1;
-                }
-                if right_das_piece.x != piece.x {
-                    moves.push((right_das_piece, "move_to_right", 1));
-                }
+            let mut right_das_piece = piece.clone();
+            while board.can_place_piece(&right_das_piece.moved(1, 0)) {
+                right_das_piece.x += 1;
+            }
+            if right_das_piece.x != piece.x {
+                moves.push((right_das_piece, "move_to_right", das_cost));
             }
 
             for (next_piece, action, action_cost) in moves {

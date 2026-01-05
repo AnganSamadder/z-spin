@@ -79,6 +79,11 @@ export class GameState {
         return this.currentBag.pop()!;
     }
 
+    // For debug scenarios: force a specific bag order
+    public setCurrentBag(bag: (keyof typeof TETROMINOES)[]): void {
+        this.currentBag = [...bag];
+    }
+
     // Get the next tetromino from the queue for WASM engine
     public getNextTetromino(): HeldTetrominoState | null {
         if (this.nextTetrominoQueue.length === 0) {
@@ -124,5 +129,25 @@ export class GameState {
         this.totalLinesCleared = 0;
         this.gameStartTimestampMs = Date.now();
         this.fillCurrentBag();
+    }
+
+    // Add cheese lines (gray blocks with one random hole per line)
+    public addCheeseLines(count: number = 10): void {
+        const cheeseColor = 0x808080; // Gray color for cheese blocks
+        
+        // Shift existing board up by the number of cheese lines
+        for (let y = 0; y < this.board.length - count; y++) {
+            this.board[y] = [...this.board[y + count]];
+        }
+        
+        // Add cheese lines at the bottom
+        for (let i = 0; i < count; i++) {
+            const y = this.board.length - count + i;
+            this.board[y] = Array(BOARD_WIDTH_BLOCKS).fill(cheeseColor);
+            
+            // Remove one random block per line to create a hole
+            const holeX = Math.floor(Math.random() * BOARD_WIDTH_BLOCKS);
+            this.board[y][holeX] = null;
+        }
     }
 }

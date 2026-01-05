@@ -36,6 +36,8 @@ export class WasmEngine {
         return { aggregate_height: -0.8, max_height: -0.9, bumpiness: -0.5, holes: -0.6, completed_lines: 1.2 };
       case '9-0':
         return { aggregate_height: -0.55, max_height: -0.25, bumpiness: -0.15, holes: -0.85, completed_lines: 0.9 };
+      case 'Cheese':
+        return { aggregate_height: -0.40, max_height: -0.60, bumpiness: -0.50, holes: -0.80, completed_lines: 2.00 };
       case 'Balanced':
       default:
         return { aggregate_height: -0.51, max_height: -0.18, bumpiness: -0.18, holes: -0.36, completed_lines: 0.76 };
@@ -555,25 +557,14 @@ export class WasmEngine {
         this.replanFromCurrent();
         return;
       }
-      // Interpret soft_drop conservatively when additional moves remain: step down once to preserve lateral/rotational room
+      // soft_drop: Drop to the floor, matching Rust pathfinder behavior.
+      // The Rust pathfinder uses 'move_down' for single-cell drops during interleaved tucks.
       if (currentMove === 'soft_drop') {
         const s = this.gameScene.gameState.currentTetromino;
-        const nextMove = moves[index];
         if (s) {
-          // If next move is not a terminal hard_drop, step a single row
-          if (nextMove && nextMove !== 'hard_drop') {
-            const can = !this.gameScene.gameLogic.physics.checkCollision(s.x, s.y + 1, s.shape);
-            if (can) {
-              this.controller.moveDown();
-            }
-          } else {
-            // If hard_drop is next, allow deeper descent toward expected lock y for nicer alignment
-            const targetY = this.expectedFinalPosition ? this.expectedFinalPosition.y : s.y + 1;
-            while (s && s.y < targetY) {
-              const can = !this.gameScene.gameLogic.physics.checkCollision(s.x, s.y + 1, s.shape);
-              if (!can) break;
-              this.controller.moveDown();
-            }
+          // Always drop to the floor, as expected by the Rust pathfinder
+          while (!this.gameScene.gameLogic.physics.checkCollision(s.x, s.y + 1, s.shape)) {
+            this.controller.moveDown();
           }
         }
         const delay = Math.max(0, this.sequencePlaybackDelayMs);
@@ -884,76 +875,32 @@ export class WasmEngine {
         this.controller.moveRight();
         break;
       case 'move_to_left': {
+        // DAS (Delayed Auto Shift) - move ALL THE WAY to the left wall
+        // This simulates holding the left key with DAS charged
         const s0 = this.gameScene.gameState.currentTetromino;
         if (!s0) break;
-        const targetX = (this.expectedPreHardDrop?.x ?? this.expectedFinalPosition?.x);
-        if (this.strictHumanInputs) {
-          if (typeof targetX === 'number') {
-            // Clamp toward targetX to avoid overshoot
-            while (true) {
-              const s = this.gameScene.gameState.currentTetromino;
-              if (!s) break;
-              if (s.x <= targetX) break;
-              const can = !this.gameScene.gameLogic.physics.checkCollision(s.x - 1, s.y, s.shape);
-              if (!can) {
-                // Allow micro-drop if still above expected lock to sneak under ledges
-                if (this.expectedFinalPosition && s.y < this.expectedFinalPosition.y) {
-                  const canDown = !this.gameScene.gameLogic.physics.checkCollision(s.x, s.y + 1, s.shape);
-                  if (canDown) { this.controller.moveDown(); continue; }
-                }
-                break;
-              }
-              this.controller.moveLeft();
-            }
-          } else {
-            // Fallback: to wall
-            while (true) {
-              const s = this.gameScene.gameState.currentTetromino;
-              if (!s) break;
-              const can = !this.gameScene.gameLogic.physics.checkCollision(s.x - 1, s.y, s.shape);
-              if (!can) break;
-              this.controller.moveLeft();
-            }
-          }
-        } else {
-          this.controller.moveToLeft();
+        // Always move to wall - DAS doesn't clamp to target
+        while (true) {
+          const s = this.gameScene.gameState.currentTetromino;
+          if (!s) break;
+          const can = !this.gameScene.gameLogic.physics.checkCollision(s.x - 1, s.y, s.shape);
+          if (!can) break;
+          this.controller.moveLeft();
         }
         break;
       }
       case 'move_to_right': {
+        // DAS (Delayed Auto Shift) - move ALL THE WAY to the right wall
+        // This simulates holding the right key with DAS charged
         const s0 = this.gameScene.gameState.currentTetromino;
         if (!s0) break;
-        const targetX = (this.expectedPreHardDrop?.x ?? this.expectedFinalPosition?.x);
-        if (this.strictHumanInputs) {
-          if (typeof targetX === 'number') {
-            // Clamp toward targetX to avoid overshoot
-            while (true) {
-              const s = this.gameScene.gameState.currentTetromino;
-              if (!s) break;
-              if (s.x >= targetX) break;
-              const can = !this.gameScene.gameLogic.physics.checkCollision(s.x + 1, s.y, s.shape);
-              if (!can) {
-                // Allow micro-drop if still above expected lock to sneak under ledges
-                if (this.expectedFinalPosition && s.y < this.expectedFinalPosition.y) {
-                  const canDown = !this.gameScene.gameLogic.physics.checkCollision(s.x, s.y + 1, s.shape);
-                  if (canDown) { this.controller.moveDown(); continue; }
-                }
-                break;
-              }
-              this.controller.moveRight();
-            }
-          } else {
-            // Fallback: to wall
-            while (true) {
-              const s = this.gameScene.gameState.currentTetromino;
-              if (!s) break;
-              const can = !this.gameScene.gameLogic.physics.checkCollision(s.x + 1, s.y, s.shape);
-              if (!can) break;
-              this.controller.moveRight();
-            }
-          }
-        } else {
-          this.controller.moveToRight();
+        // Always move to wall - DAS doesn't clamp to target
+        while (true) {
+          const s = this.gameScene.gameState.currentTetromino;
+          if (!s) break;
+          const can = !this.gameScene.gameLogic.physics.checkCollision(s.x + 1, s.y, s.shape);
+          if (!can) break;
+          this.controller.moveRight();
         }
         break;
       }

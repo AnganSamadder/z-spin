@@ -1,26 +1,34 @@
 extern crate console_error_panic_hook;
 use wasm_bindgen::prelude::*;
 
-mod board;
-mod pieces;
-mod search;
-mod evaluation;
+pub mod board;
+pub mod pieces;
+pub mod search;
+pub mod evaluation;
 mod engine;
 
 use engine::TetrisEngine;
 use crate::evaluation::Strategy;
 // Prune unused imports
 
-// Console.log for debugging
+// Console.log for debugging - WASM target
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_namespace = console)]
     fn log(s: &str);
 }
 
-// Make log function available to modules
+// Make log function available to modules - WASM target
+#[cfg(target_arch = "wasm32")]
 pub(crate) fn console_log_fn(msg: &str) {
     log(msg);
+}
+
+// Make log function print to stdout for non-WASM targets (CLI tools)
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn console_log_fn(msg: &str) {
+    println!("{}", msg);
 }
 
 // Simple macro for console.log that uses our wrapper function

@@ -60,6 +60,30 @@ Notes:
 - The engine’s search already explores tuck/spin paths. This strategy’s weights encourage using those options to preserve a clean 9-0 stack.
 - Hold and 7-bag awareness: the engine considers hold when beneficial. Dedicated long-term bag timing heuristics will be layered in future substrategies.
 
+#### Cheese
+- **Intent**: Aggressive downstacking with strong anti-building and flatness penalties. Clears cheese lines efficiently while heavily penalizing building too high above cheese, wasting non-I pieces on building, and creating uneven surfaces. Maintains very flat, organized board.
+- **Weights (UI subset)**:
+  - aggregate_height: -0.40
+  - max_height: -0.60
+  - bumpiness: -0.50
+  - holes: -0.80
+  - completed_lines: +2.00
+- **Rust-only shaping knobs**:
+  - new_holes_penalty: 15.0 (moderate penalty to keep board cleaner)
+  - weighted_holes: -0.05 (moderate penalty for cleanliness)
+  - blocks_above_holes_penalty: -0.25 (reduced penalty on covering holes, height-weighted)
+  - holes_cleared_bonus: +10.0 (very strong bonus for clearing holes)
+  - non_tetris_clear_penalty_per_line: -1.00 (strongly rewards non-tetris clears)
+  - cavity_cells: -0.50 (higher penalty on cavities for cleaner board)
+  - cavity_cells_sq: -0.01 (higher quadratic penalty)
+  - overhang_cells: -0.20 (higher penalty on overhangs)
+  - overhang_cells_sq: -0.005 (higher quadratic penalty)
+  - covered_cells: -0.10 (higher penalty on covered cells)
+  - covered_cells_sq: -0.005 (higher quadratic scaling)
+  - cheese_height_penalty: -10.0 (very heavy penalty for building >3 rows above cheese)
+  - non_i_building_penalty: -2.0 (strong penalty for wasting non-I pieces on building)
+  - left9_height_range: -0.30 (penalty for height differences across left 9 columns, encourages flat building)
+
 ### How to switch strategies
 - Use the “Strategy” buttons in the right-side rectangle (visible when Debug Mode is Off). Strategy changes apply live while the engine is running.
 
@@ -67,5 +91,16 @@ Notes:
 - When adding a new strategy or changing weights:
   - Add the new preset in `WasmLoader.STRATEGY_MAP` and reflect UI weights in `WasmEngine.getUiEvalWeights`.
   - Update this file with the new strategy’s intent and exact weights.
+
+### Research notes
+- **Cheese strategy**: Inspired by Cold Clear's downstacking techniques from [MinusKelvin/cold-clear](https://github.com/MinusKelvin/cold-clear). Key features include:
+  - Cavity cells: Fully enclosed empty spaces (heavily penalized)
+  - Overhang cells: Partially enclosed empty spaces (penalized)
+  - Covered cells: Blocks above holes (with quadratic scaling)
+  - Piece dependency awareness for hole filling
+  - **Downstacking approach**: Research shows that effective downstacking requires prioritizing clearing over building clean. The strategy now uses very low penalties on height/bumpiness and strongly rewards any line clears (including singles/doubles) to encourage aggressive hole clearing rather than conservative tower building.
+  - **Enhanced hole coverage penalty**: The AI now intelligently avoids placing blocks that would cover holes, with exponentially higher penalties for covering higher holes. This prevents the AI from making holes harder to fill by placing blocks on top of them.
+  - **Non-I building penalty**: The AI is heavily penalized for using non-I pieces to build high above cheese instead of using them for clearing. This encourages using T/Z/S pieces for line clears rather than tower building.
+  - **Enhanced flatness penalties**: Much stronger bumpiness penalty (-0.50) and new height range penalty (-0.30) encourage the AI to build very flat surfaces across all columns, preventing uneven tower building.
 
 

@@ -74,16 +74,6 @@ impl Board {
                     return false; // This part of the piece is off the board
                 }
 
-                // Check horizontal bounds for each block in this row
-                for bit_pos in 0..16 {
-                    if (row_mask & (1 << bit_pos)) != 0 {
-                        // This position has a block - check if it's within board width
-                        if bit_pos < 0 || bit_pos >= BOARD_WIDTH as i32 {
-                            return false; // Block is outside board width (0-9)
-                        }
-                    }
-                }
-
                 // Check for collisions with existing pieces (only bits 0-9 matter for board state)
                 let board_row = self.rows[board_y as usize];
                 let board_collision_mask = row_mask & ((1 << BOARD_WIDTH) - 1); // Mask to only consider bits 0-9
@@ -93,7 +83,7 @@ impl Board {
             }
             true // All parts of the piece are on the board and not colliding
         } else {
-            false // Piece mask not found (shouldn't happen with fixed mask generation)
+            false // Piece mask not found
         }
     }
 
@@ -155,10 +145,10 @@ impl Board {
         let total_height = heights.iter().sum::<usize>() as f64;
         let max_height = *heights.iter().max().unwrap_or(&0) as f64;
         // Right-well helpers
-        let right_well_height = heights[BOARD_WIDTH - 1] as f64; // column 9
-        let left_9_max_height = (*heights[0..BOARD_WIDTH - 1].iter().max().unwrap_or(&0)) as f64;
-        let mut right_well_fill_rows = 0.0; // number of visible cells filled in col 9
-        let mut tetris_ready_rows = 0.0;    // rows where cols 0..8 are full and col 9 is empty
+        let _right_well_height = heights[BOARD_WIDTH - 1] as f64; // column 9
+        let _left_9_max_height = (*heights[0..BOARD_WIDTH - 1].iter().max().unwrap_or(&0)) as f64;
+        let mut _right_well_fill_rows = 0.0; // number of visible cells filled in col 9
+        let mut _tetris_ready_rows = 0.0;    // rows where cols 0..8 are full and col 9 is empty
 
         // More efficient hole counting: an empty cell with a block above it.
         for x in 0..BOARD_WIDTH {
@@ -182,14 +172,94 @@ impl Board {
         for y in start_row..BOARD_HEIGHT {
             let filled_left_9 = (0..BOARD_WIDTH - 1).all(|x| self.get_cell(x, y));
             let right_well_filled = self.get_cell(BOARD_WIDTH - 1, y);
-            if right_well_filled { right_well_fill_rows += 1.0; }
-            if filled_left_9 && !right_well_filled { tetris_ready_rows += 1.0; }
+            if right_well_filled { _right_well_fill_rows += 1.0; }
+            if filled_left_9 && !right_well_filled { _tetris_ready_rows += 1.0; }
         }
 
         // Attach auxiliary metrics into bumpiness using a compact encoding is not ideal;
         // instead the evaluation function will ask for these via a dedicated API. For now,
         // we return the standard metrics; auxiliary values can be recomputed where needed.
         (total_height, max_height, holes, bumpiness)
+    }
+
+    /// Calculate penalty for building too high above cheese lines
+    /// Returns penalty based on how many rows are built above the cheese
+    pub fn get_cheese_height_penalty(&self) -> f64 {
+        let heights = self.get_heights();
+        let max_height = *heights.iter().max().unwrap_or(&0);
+        
+        // Find the highest cheese line (gray blocks)
+        // For now, we'll assume cheese is in the bottom 10 rows
+        // In a real implementation, you'd track cheese lines more precisely
+        let cheese_base_height = 10; // Assume cheese is in bottom 10 rows
+        
+        if max_height <= cheese_base_height {
+            return 0.0; // No penalty if we're not above cheese
+        }
+        
+        let excess_height = max_height - cheese_base_height;
+        
+        // Heavy penalty for building more than 3 rows above cheese
+        if excess_height > 3 {
+            // Quadratic penalty for excessive height
+            let penalty = (excess_height - 3) as f64;
+            return penalty * penalty; // Quadratic scaling
+        }
+        
+        0.0 // No penalty if within 3 rows of cheese
+    }
+
+    /// Calculate penalty for using non-I pieces to build high instead of clear
+    /// Returns penalty based on how many non-I pieces are used for building above cheese
+    pub fn get_non_i_building_penalty(&self) -> f64 {
+        let heights = self.get_heights();
+        let max_height = *heights.iter().max().unwrap_or(&0);
+        
+        // Assume cheese is in bottom 10 rows
+        let cheese_base_height = 10;
+        
+        if max_height <= cheese_base_height {
+            return 0.0; // No penalty if not above cheese
+        }
+        
+        let excess_height = max_height - cheese_base_height;
+        
+        // Only apply penalty if building more than 2 rows above cheese
+        if excess_height > 2 {
+            // Count how many columns are contributing to the high building
+            let mut high_columns = 0;
+            for &height in &heights {
+                if height > cheese_base_height + 2 {
+                    high_columns += 1;
+                }
+            }
+            
+            // Penalty increases with both excess height and number of high columns
+            let penalty = excess_height as f64 * high_columns as f64;
+            return penalty;
+        }
+        
+        0.0 // No penalty if within 2 rows of cheese
+    }
+
+    /// Calculate penalty for height differences across columns (encourages flat building)
+    /// Returns penalty based on the range between highest and lowest columns
+    pub fn get_height_range_penalty(&self) -> f64 {
+        let heights = self.get_heights();
+        
+        // Focus on left 9 columns (excluding right well)
+        let left_heights = &heights[0..BOARD_WIDTH - 1];
+        
+        if left_heights.is_empty() {
+            return 0.0;
+        }
+        
+        let min_height = *left_heights.iter().min().unwrap_or(&0);
+        let max_height = *left_heights.iter().max().unwrap_or(&0);
+        let height_range = max_height - min_height;
+        
+        // Quadratic penalty for height range to strongly discourage uneven building
+        (height_range * height_range) as f64
     }
 
     // Display board for debugging - shows only visible rows (bottom 20)

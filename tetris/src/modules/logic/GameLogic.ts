@@ -28,6 +28,7 @@ export class GameLogic {
 
     private addRandomPieceToNextQueue(): void {
         const typeKey = this.gameState.getNextFromBag();
+        console.debug(`[GameLogic] Adding ${typeKey} to queue`);
         this.gameState.nextTetrominoQueue.push({ typeKey: typeKey });
     }
 
@@ -36,9 +37,11 @@ export class GameLogic {
         const result = this.physics.spawnNewTetromino();
 
         if (result.gameOver) {
+            console.log(`[GameLogic] GAME OVER - Collision on spawn`);
             this.handleGeneralGameOver();
             return;
         }
+        console.log(`[GameLogic] Spawned: ${this.gameState.currentTetromino?.typeKey} at (${this.gameState.currentTetromino?.x}, ${this.gameState.currentTetromino?.y})`);
 
         // Reset manipulation flag to allow player control of new piece
         this.gameState.canManipulatePiece = true;
@@ -139,9 +142,11 @@ export class GameLogic {
         const result = this.physics.performHold();
         if (result.success) {
             if (result.gameOver) {
+                console.log(`[GameLogic] GAME OVER - Spawn from hold blocked`);
                 this.handleGeneralGameOver();
                 return;
             }
+            console.log(`[GameLogic] Hold Success - Current Piece: ${this.gameState.currentTetromino?.typeKey}, Held Piece: ${this.gameState.heldTetromino?.typeKey}`);
 
             // Reset manipulation flag to allow player control of new piece
             this.gameState.canManipulatePiece = true;
@@ -171,6 +176,7 @@ export class GameLogic {
 
         // Update score display again if lines were cleared and show scoring popups
         if (result.clearedLines > 0) {
+            console.log(`[GameLogic] Hard Drop Clear: ${result.displayInfo?.clearType} x${result.clearedLines}, Combo: ${result.displayInfo?.comboCount}, B2B: ${result.displayInfo?.b2bCount}`);
             this.renderer.updateScore(this.gameState.score);
 
             // Show text for T-spins and special clears only (other spins are silent)

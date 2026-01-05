@@ -48,3 +48,4 @@ ehthumbs.db
 
 # Debug files
 debug.log
+.reference/

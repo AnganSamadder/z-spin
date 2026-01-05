@@ -363,6 +363,7 @@ export class GameScene extends Phaser.Scene {
             Strategy.Aggressive,
             Strategy.Defensive,
             Strategy.NineZero,
+            Strategy.Cheese,
         ];
 
         const currentSettings: GameSettings = this.registry.get('gameSettings') || { ...DEFAULT_SETTINGS };
@@ -395,5 +396,143 @@ export class GameScene extends Phaser.Scene {
 
         strategyWrapper.appendChild(buttonsRow);
         container.appendChild(strategyWrapper);
+
+        // Add Cheese button
+        const cheeseWrapper = document.createElement('div');
+        cheeseWrapper.style.display = 'flex';
+        cheeseWrapper.style.flexDirection = 'column';
+        cheeseWrapper.style.alignItems = 'center';
+        cheeseWrapper.style.gap = '8px';
+
+        const cheeseButton = document.createElement('button');
+        cheeseButton.textContent = 'Add Cheese (10 lines)';
+        cheeseButton.style.padding = '8px 14px';
+        cheeseButton.style.fontSize = '14px';
+        cheeseButton.style.cursor = 'pointer';
+        cheeseButton.style.borderRadius = '16px';
+        cheeseButton.style.border = '1px solid #555';
+        cheeseButton.style.backgroundColor = '#8B4513'; // Brown color for cheese
+        cheeseButton.style.color = '#fff';
+        cheeseButton.style.fontWeight = 'bold';
+
+        cheeseButton.addEventListener('click', () => {
+            this.gameState.addCheeseLines(10);
+            this.gameRenderer.drawGame();
+            console.log('🧀 Added 10 lines of cheese to the board!');
+            
+            // Visual feedback - briefly change button text
+            const originalText = cheeseButton.textContent;
+            cheeseButton.textContent = '🧀 Cheese Added!';
+            cheeseButton.style.backgroundColor = '#32CD32'; // Green for success
+            setTimeout(() => {
+                cheeseButton.textContent = originalText;
+                cheeseButton.style.backgroundColor = '#8B4513'; // Back to brown
+            }, 1000);
+        });
+
+        cheeseWrapper.appendChild(cheeseButton);
+        container.appendChild(cheeseWrapper);
+
+
+        // Add Debug TST Scenario button
+        const tstDebugWrapper = document.createElement('div');
+        tstDebugWrapper.style.display = 'flex';
+        tstDebugWrapper.style.flexDirection = 'column';
+        tstDebugWrapper.style.alignItems = 'center';
+        tstDebugWrapper.style.gap = '8px';
+
+        const tstDebugButton = document.createElement('button');
+        tstDebugButton.textContent = 'Debug TST Scenario';
+        tstDebugButton.style.padding = '10px 20px';
+        tstDebugButton.style.backgroundColor = '#4a148c';
+        tstDebugButton.style.color = 'white';
+        tstDebugButton.style.border = 'none';
+        tstDebugButton.style.borderRadius = '5px';
+        tstDebugButton.style.cursor = 'pointer';
+        tstDebugButton.style.fontWeight = 'bold';
+
+        tstDebugButton.addEventListener('click', () => {
+            this.setupTstDebugScenario();
+            console.log('🧪 TST debug scenario loaded! Press "Debug Next Move" to test.');
+            
+            // Visual feedback
+            const originalText = tstDebugButton.textContent;
+            tstDebugButton.textContent = '🧪 Scenario Loaded!';
+            tstDebugButton.style.backgroundColor = '#32CD32';
+            setTimeout(() => {
+                tstDebugButton.textContent = originalText;
+                tstDebugButton.style.backgroundColor = '#4A148C';
+            }, 1000);
+        });
+
+        tstDebugWrapper.appendChild(tstDebugButton);
+        container.appendChild(tstDebugWrapper);
+    }
+
+    /**
+     * Sets up a deterministic board state for testing T-Spin Triple (TST) pathfinding.
+     */
+    private setupTstDebugScenario(): void {
+        const state = this.gameState;
+        const blockColor = 0x808080; // Gray blocks
+
+        // Clear the board first
+        state.resetBoard();
+
+        // Create a T-Spin Triple (TST) structure based on user's setup
+        // Target:
+        // r10-r14: ██████····
+        // r15:     ███████···
+        // r16:     ██████····
+        // r17:     ██████·███
+        // r18:     ██████··██  <-- The "missing hole" at col 7
+        // r19:     ██████·███
+        
+        const visibleStart = state.board.length - 20;
+
+        // Rows 10-14 (Col 0-5 blocked)
+        for (let y = 10; y <= 14; y++) {
+            for (let x = 0; x <= 5; x++) {
+                state.board[visibleStart + y][x] = blockColor;
+            }
+        }
+
+        // Row 15: ███████··· (Col 0-6 blocked)
+        for (let x = 0; x <= 6; x++) {
+            state.board[visibleStart + 15][x] = blockColor;
+        }
+
+        // Row 16: ██████···· (Col 0-5 blocked)
+        for (let x = 0; x <= 5; x++) {
+            state.board[visibleStart + 16][x] = blockColor;
+        }
+
+        // Rows 17, 18, 19
+        for (let y = 17; y <= 19; y++) {
+            // Col 0-5 blocked
+            for (let x = 0; x <= 5; x++) {
+                state.board[visibleStart + y][x] = blockColor;
+            }
+            // Col 7-9 blocked (mostly)
+            for (let x = 7; x <= 9; x++) {
+                if (y === 18 && x === 7) continue; // The TST "hole"
+                state.board[visibleStart + y][x] = blockColor;
+            }
+        }
+
+        // Force spawn a T-piece as the current piece
+        state.setCurrentBag(['T', 'I', 'O', 'S', 'Z', 'L', 'J']);
+        state.nextTetrominoQueue = [{ typeKey: 'T' }];
+        
+        // Spawn the T-piece
+        this.gameLogic.spawnNewTetromino();
+        
+        // Re-render the game
+        this.gameRenderer.drawGame();
+
+        console.log("🛠️ TST Debug Scenario Setup Refined");
+        console.log('📋 EXPECTED: The T-piece should perform a T-Spin Triple in the gap at column 6.');
+        console.log('📋 This requires specific SRS kicks to rotate under the overhang.');
+        console.log('📋 Click "Debug Next Move" to see what the engine does!');
     }
 }

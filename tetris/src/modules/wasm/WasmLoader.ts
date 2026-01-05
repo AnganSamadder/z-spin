@@ -129,6 +129,7 @@ class WasmLoader {
     'Defensive': 2,
     '9-0': 3,
     'NineZero': 3, // internal enum name
+    'Cheese': 4,
   };
 
   private constructor() {}

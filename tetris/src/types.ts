@@ -3,6 +3,7 @@ export enum Strategy {
     Aggressive = 'Aggressive',
     Defensive = 'Defensive',
     NineZero = 'NineZero',
+    Cheese = 'Cheese',
 }
 
 // Define GameSettings interface and default values
